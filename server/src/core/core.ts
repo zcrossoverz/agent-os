@@ -30,7 +30,9 @@ export interface ServerConfig {
   insecureNoAuth: boolean;
 }
 
-export function defaultConfig(overrides: Partial<ServerConfig> = {}): ServerConfig {
+export function defaultConfig(input: Partial<ServerConfig> = {}): ServerConfig {
+  // Ignore keys that are present but undefined (e.g. unset CLI flags) so defaults apply.
+  const overrides = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)) as Partial<ServerConfig>;
   const dataDir = overrides.dataDir ?? process.env.AGENTOS_DATA_DIR ?? path.resolve('.agentos');
   const port = overrides.port ?? Number(process.env.AGENTOS_PORT ?? 4600);
   return {

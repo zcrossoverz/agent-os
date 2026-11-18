@@ -477,7 +477,7 @@ export async function buildApp(core: Core, auth: OwnerAuth): Promise<FastifyInst
   // ---------------------------------------------------------------- dashboard (static SPA)
 
   if (core.config.webDir && fs.existsSync(path.join(core.config.webDir, 'index.html'))) {
-    await app.register(fastifyStatic, { root: core.config.webDir, prefix: '/', wildcard: false });
+    await app.register(fastifyStatic, { root: core.config.webDir, prefix: '/', wildcard: true });
     app.setNotFoundHandler((req, reply) => {
       if (req.url.startsWith('/api/') || req.url.startsWith('/mcp')) return reply.status(404).send({ error: 'Not found' });
       return reply.type('text/html').sendFile('index.html');
