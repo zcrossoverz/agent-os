@@ -120,7 +120,7 @@ export class Scheduler {
       const m = this.core.messaging.getMessage(i.ref_id);
       if (m?.sender_type !== 'owner') continue;
       const conv = this.core.messaging.getConversation(m.conversation_id);
-      if (conv.kind === 'direct') ownerReply = conv.id;
+      if (conv.kind === 'direct' && this.core.messaging.participants(conv).includes(agent.id)) ownerReply = conv.id;
     }
 
     this.core.runs.createAgentRun({ agent, trigger, items, focusTask: focus, sessionKey, prompt, recovery, ownerReplyConversationId: ownerReply });

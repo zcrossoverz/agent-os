@@ -164,7 +164,9 @@ export class MessagingService {
       const msg = toMessage(this.db.get('SELECT * FROM messages WHERE id = ?', id)!);
       const fromLabel = senderType === 'owner' ? 'Owner' : senderType === 'system' ? 'AgentOS' : `${sender!.name} (@${sender!.slug})`;
       const summary = `${fromLabel} in ${conv.kind === 'direct' ? 'a direct message' : conv.title}: ${truncate(body.replace(/\s+/g, ' '), 160)}`;
-      const mentions = this.mentionedAgents(project.id, body);
+      // @mentions pull people into shared spaces (team channel, task threads). Direct conversations are
+      // private: mentioning a third party there ("assign it to @dan") is an instruction, not a wake-up.
+      const mentions = conv.kind === 'direct' ? [] : this.mentionedAgents(project.id, body);
       const recipients = this.recipients(conv, senderParticipant, project.id);
       const pm = this.core.agents.pm(project.id);
 

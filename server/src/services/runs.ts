@@ -1,7 +1,7 @@
 import type { Core } from '../core/core.js';
 import { toRun } from '../core/mappers.js';
 import type { Agent, InboxItem, Run, RunAssignment, RunCompletion, RunnerEvent, Runner, Task } from '../core/types.js';
-import { badRequest, newId, newToken, notFound, nowIso, sha256, truncate } from '../util/util.js';
+import { badRequest, log, newId, newToken, notFound, nowIso, sha256, truncate } from '../util/util.js';
 import { buildSystemPrompt } from '../orchestrator/prompts.js';
 
 export interface CreateAgentRunInput {
@@ -234,9 +234,15 @@ export class RunService {
         provider_session_id: c.sessionId ?? run.provider_session_id,
         token_hash: null,
       });
-      if (run.kind === 'merge') this.completeMerge(run, c);
-      else this.completeAgentRun(run, c);
     });
+    // Follow-up effects run after the run is finalized: a failing side effect (e.g. posting a reply)
+    // must never leave a run stuck in "running" or make the runner retry the completion.
+    try {
+      this.db.tx(() => (run.kind === 'merge' ? this.completeMerge(run, c) : this.completeAgentRun(run, c)));
+    } catch (e) {
+      log('error', `Post-completion handling failed for ${runId}`, { error: String((e as Error)?.stack ?? e) });
+      this.core.activity(run.project_id, 'system', 'run.followup_failed', `Follow-up for run ${runId} failed: ${(e as Error).message}`, { type: 'run', id: runId });
+    }
     this.core.bus.change({ topic: 'runs', projectId: run.project_id, id: runId });
     this.core.bus.kick();
     return this.get(runId);
