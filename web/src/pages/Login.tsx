@@ -8,9 +8,8 @@ export function LoginPage() {
   const [busy, setBusy] = useState(false);
   return (
     <div className="relative flex min-h-full items-center justify-center overflow-hidden p-6">
-      <div className="pointer-events-none absolute top-1/4 left-1/2 size-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-500/20 blur-[120px]" />
       <form
-        className="card animate-in relative w-full max-w-sm p-7 dark:bg-ink-900/90 dark:backdrop-blur-xl"
+        className="card animate-in relative w-full max-w-sm p-7"
         onSubmit={async (e) => {
           e.preventDefault();
           setBusy(true);
