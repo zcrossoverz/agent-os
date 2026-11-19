@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
-import { FileText, Plus, Pencil, Trash2 } from 'lucide-react';
+import { FileText, Plus, Pencil, Trash2, ChevronLeft } from 'lucide-react';
 import { api, useAction } from '../../lib/api';
 import { useDoc, useDocs } from '../../lib/queries';
 import { useProjectCtx } from './ProjectLayout';
@@ -12,6 +12,7 @@ export function KnowledgePage() {
   const [slug, setSlug] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [docOpen, setDocOpen] = useState(false); // phones: one pane at a time
   const doc = useDoc(project.id, slug);
   useEffect(() => {
     if (!slug && docs.data?.length) setSlug(docs.data.find((d) => d.slug === 'brief')?.slug ?? docs.data[0].slug);
@@ -22,12 +23,12 @@ export function KnowledgePage() {
   if (docs.isLoading) return <Loading />;
   return (
     <div className="flex h-full min-h-0">
-      <div className="w-64 shrink-0 overflow-y-auto border-r border-zinc-200 p-3 dark:border-white/[0.06]">
+      <div className={clsx('w-64 shrink-0 overflow-y-auto border-r border-zinc-200 p-3 md:block dark:border-white/[0.06]', docOpen ? 'hidden' : 'block max-md:w-full max-md:border-r-0')}>
         <button className="btn btn-sm mb-3 w-full" onClick={() => setCreating(true)}>
           <Plus className="size-3.5" /> New doc
         </button>
         {docs.data?.map((d) => (
-          <button key={d.slug} onClick={() => { setSlug(d.slug); setEditing(false); }} className={clsx('flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left', d.slug === slug ? 'bg-zinc-100 dark:bg-white/[0.06]' : 'hover:bg-zinc-50 dark:hover:bg-white/[0.03]')}>
+          <button key={d.slug} onClick={() => { setSlug(d.slug); setEditing(false); setDocOpen(true); }} className={clsx('flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left', d.slug === slug ? 'bg-zinc-100 dark:bg-white/[0.06]' : 'hover:bg-zinc-50 dark:hover:bg-white/[0.03]')}>
             <FileText className="mt-0.5 size-4 shrink-0 text-zinc-400" />
             <div className="min-w-0">
               <div className="truncate text-sm font-medium">{d.title}</div>
@@ -39,7 +40,10 @@ export function KnowledgePage() {
         ))}
         <p className="mt-4 px-2 text-[11px] leading-relaxed text-zinc-500">Shared knowledge lives here, outside any agent's memory: the brief, plans, design notes and conventions. Agents read and write it with their tools.</p>
       </div>
-      <div className="min-w-0 flex-1 overflow-y-auto px-8 py-6">
+      <div className={clsx('min-w-0 flex-1 overflow-y-auto px-4 py-4 md:block md:px-8 md:py-6', docOpen ? 'block' : 'hidden')}>
+        <button className="mb-3 flex items-center gap-1 text-sm text-zinc-500 md:hidden" onClick={() => setDocOpen(false)}>
+          <ChevronLeft className="size-4" /> All docs
+        </button>
         {!slug ? (
           <Empty title="No docs yet" />
         ) : !doc.data ? (
@@ -79,7 +83,7 @@ function DocEditor({ projectId, slug, title, body, onDone }: { projectId: string
   const save = useAction(() => api('PUT', `/api/projects/${projectId}/docs/${encodeURIComponent(s || t.toLowerCase().replace(/[^a-z0-9]+/g, '-'))}`, { title: t, body: b }), { success: 'Saved', onSuccess: (d: any) => onDone(d.slug) });
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-[1fr_12rem] gap-3">
+      <div className="grid gap-3 sm:grid-cols-[1fr_12rem]">
         <Field label="Title">
           <input className="input" value={t} onChange={(e) => setT(e.target.value)} />
         </Field>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import clsx from 'clsx';
-import { Send, Users, Hash, Crown, Eye, Loader2 } from 'lucide-react';
+import { Send, Users, Hash, Crown, Eye, Loader2, ChevronLeft } from 'lucide-react';
 import { api, useAction } from '../../lib/api';
 import { useConversations, useMessages } from '../../lib/queries';
 import type { ConversationRow } from '../../lib/types';
@@ -14,6 +14,9 @@ export function ChatPage() {
   const nav = useNavigate();
   const convs = useConversations(project.id);
   const pm = agents.find((a) => a.is_pm);
+  // Phones show one pane at a time: the open thread, or the list of conversations.
+  const [listOpen, setListOpen] = useState(false);
+  useEffect(() => setListOpen(false), [conversationId]);
 
   const openDirect = useAction((agentId: string) => api<ConversationRow>('POST', `/api/projects/${project.id}/direct/${agentId}`), {
     onSuccess: (c) => nav(`/p/${project.slug}/chat/${c.id}`, { replace: true }),
@@ -46,7 +49,7 @@ export function ChatPage() {
 
   const current = convs.data?.find((c) => c.id === conversationId);
   const item = (key: string, active: boolean, onClick: () => void, icon: React.ReactNode, label: React.ReactNode, sub?: React.ReactNode, right?: React.ReactNode) => (
-    <button key={key} onClick={onClick} className={clsx('flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition', active ? 'bg-white shadow-xs ring-1 ring-zinc-200 dark:bg-white/[0.06] dark:ring-white/[0.06]' : 'hover:bg-white/60 dark:hover:bg-white/[0.03]')}>
+    <button key={key} onClick={() => { onClick(); setListOpen(false); }} className={clsx('flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition', active ? 'bg-white shadow-xs ring-1 ring-zinc-200 dark:bg-white/[0.06] dark:ring-white/[0.06]' : 'hover:bg-white/60 dark:hover:bg-white/[0.03]')}>
       {icon}
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{label}</div>
@@ -58,7 +61,7 @@ export function ChatPage() {
 
   return (
     <div className="flex h-full min-h-0">
-      <div className="flex w-72 shrink-0 flex-col gap-4 overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-3 scrollbar-thin dark:border-white/[0.06] dark:bg-ink-925/60">
+      <div className={clsx('w-72 shrink-0 flex-col gap-4 overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-3 scrollbar-thin md:flex dark:border-white/[0.06] dark:bg-ink-925/60', listOpen || !current ? 'flex max-md:w-full max-md:border-r-0' : 'hidden')}>
         <div>
           <div className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-zinc-500 uppercase">Direct</div>
           {agents.map((a) => {
@@ -99,14 +102,14 @@ export function ChatPage() {
           </div>
         )}
       </div>
-      <div className="flex min-w-0 flex-1 flex-col">
-        {current ? <Thread conv={current} /> : <Empty title="Pick a conversation" />}
+      <div className={clsx('min-w-0 flex-1 flex-col md:flex', listOpen || !current ? 'hidden' : 'flex')}>
+        {current ? <Thread conv={current} onBack={() => setListOpen(true)} /> : <Empty title="Pick a conversation" />}
       </div>
     </div>
   );
 }
 
-function Thread({ conv }: { conv: ConversationRow }) {
+function Thread({ conv, onBack }: { conv: ConversationRow; onBack: () => void }) {
   const { project, agent } = useProjectCtx();
   const messages = useMessages(conv.id);
   const [body, setBody] = useState('');
@@ -121,14 +124,17 @@ function Thread({ conv }: { conv: ConversationRow }) {
 
   return (
     <>
-      <div className="flex items-center gap-3 border-b border-zinc-200 px-5 py-3 dark:border-white/[0.06]">
+      <div className="flex items-center gap-3 border-b border-zinc-200 px-3 py-3 md:px-5 dark:border-white/[0.06]">
+        <button className="-ml-1 rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 md:hidden dark:hover:bg-white/[0.06]" onClick={onBack} aria-label="All conversations">
+          <ChevronLeft className="size-5" />
+        </button>
         {other ? <Avatar name={other.name} seed={other.id} /> : <Users className="size-5 text-zinc-400" />}
         <div className="min-w-0">
           <div className="text-sm font-semibold">{other ? `${other.name} · ${other.role}` : conv.title}</div>
           {other ? <AgentStatus status={other.status} detail={other.status_detail} /> : <div className="text-xs text-zinc-500">{conv.kind === 'team' ? 'Visible to all agents. Only @mentions (and the PM, for your messages) wake someone.' : readOnly ? 'Read-only: agents coordinating directly' : 'Task discussion'}</div>}
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 scrollbar-thin">
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 scrollbar-thin md:px-5">
         <div className="mx-auto max-w-3xl space-y-4">
           {messages.data?.map((m) => {
             const a = m.sender_type === 'agent' ? agent(m.sender_id) : undefined;

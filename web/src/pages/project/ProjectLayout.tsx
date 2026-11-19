@@ -71,7 +71,7 @@ export function ProjectLayout() {
   return (
     <ProjectCtx.Provider value={ctx}>
       <div className="flex h-full flex-col">
-        <header className="glass sticky top-0 z-20 border-b border-zinc-200/80 px-6 pt-5 dark:border-white/[0.06]">
+        <header className="glass sticky top-0 z-20 border-b border-zinc-200/80 px-4 pt-4 md:px-6 md:pt-5 dark:border-white/[0.06]">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -84,7 +84,7 @@ export function ProjectLayout() {
             </div>
             <AutonomySwitch project={p} />
           </div>
-          <nav className="mt-4 flex gap-6 overflow-x-auto scrollbar-thin">
+          <nav className="mt-3 flex gap-5 overflow-x-auto scrollbar-thin md:mt-4 md:gap-6">
             {tab(base, 'Overview')}
             {tab(`${base}/board`, 'Board')}
             {tab(`${base}/chat`, 'Chat', p.stats.unansweredOwner)}

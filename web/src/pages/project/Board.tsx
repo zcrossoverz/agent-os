@@ -35,17 +35,17 @@ export function BoardPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 px-6 pt-4">
-        <input className="input max-w-xs" placeholder="Filter by key, title or agent…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+      <div className="flex flex-wrap items-center gap-2 px-4 pt-4 md:px-6">
+        <input className="input min-w-0 flex-1 sm:max-w-xs sm:flex-none" placeholder="Filter by key, title or agent…" value={filter} onChange={(e) => setFilter(e.target.value)} />
         <label className="flex items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-400">
           <input type="checkbox" checked={showEpics} onChange={(e) => setShowEpics(e.target.checked)} /> Show epics
         </label>
-        <span className="ml-auto text-xs text-zinc-500">Drag cards to change status. Agents move their own cards as they work.</span>
-        <button className="btn btn-primary btn-sm" onClick={() => setCreating('todo')}>
+        <span className="ml-auto hidden text-xs text-zinc-500 lg:inline">Drag cards to change status. Agents move their own cards as they work.</span>
+        <button className="btn btn-primary btn-sm max-lg:ml-auto" onClick={() => setCreating('todo')}>
           <Plus className="size-3.5" /> New task
         </button>
       </div>
-      <div className="flex min-h-0 flex-1 gap-2.5 overflow-x-auto px-6 py-4 scrollbar-thin">
+      <div className="flex min-h-0 flex-1 snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 py-4 scrollbar-thin md:snap-none md:px-6">
         {COLUMNS.map((col) => (
           <div
             key={col}
@@ -64,7 +64,7 @@ export function BoardPage() {
                 move.mutate({ id, status: col });
               }
             }}
-            className={clsx('flex min-w-[178px] flex-1 flex-col rounded-2xl border border-zinc-200/70 bg-zinc-100/60 dark:border-white/[0.04] dark:bg-white/[0.015]', dragOver === col && 'ring-2 ring-accent-500/60')}
+            className={clsx('flex min-w-[78vw] flex-1 snap-start flex-col rounded-2xl sm:min-w-[178px] border border-zinc-200/70 bg-zinc-100/60 dark:border-white/[0.04] dark:bg-white/[0.015]', dragOver === col && 'ring-2 ring-accent-500/60')}
           >
             <div className="flex items-center gap-2 px-3 pt-3 pb-2">
               <span className={clsx('size-2 rounded-full', STATUS_META[col].dot)} />

@@ -1,8 +1,8 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { QueryClientProvider, useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { LayoutDashboard, KeyRound, Plus, LogOut, Sparkles, Moon, Sun, Monitor, Pause } from 'lucide-react';
+import { LayoutDashboard, KeyRound, Plus, LogOut, Sparkles, Moon, Sun, Monitor, Pause, Menu, X } from 'lucide-react';
 import { useTheme } from './lib/theme';
 import { avatarColor } from './lib/format';
 import { api, get, queryClient } from './lib/api';
@@ -41,10 +41,22 @@ function AuthGate() {
 
 function Shell({ version }: { version: string }) {
   const live = useLiveUpdates(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const loc = useLocation();
+  // On phones the sidebar is a drawer: close it whenever the route changes.
+  useEffect(() => setMenuOpen(false), [loc.pathname]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
   return (
-    <div className="flex h-full">
-      <Sidebar live={live} version={version} />
-      <main className="min-w-0 flex-1 overflow-y-auto">
+    <div className="flex h-full flex-col md:flex-row">
+      <MobileTopBar onMenu={() => setMenuOpen(true)} />
+      {menuOpen && <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px] md:hidden" onClick={() => setMenuOpen(false)} aria-hidden />}
+      <Sidebar live={live} version={version} open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
         <Routes>
           <Route path="/" element={<OverviewPage />} />
           <Route path="/accounts" element={<AccountsPage />} />
@@ -57,7 +69,26 @@ function Shell({ version }: { version: string }) {
   );
 }
 
-function Sidebar({ live, version }: { live: string; version: string }) {
+function MobileTopBar({ onMenu }: { onMenu: () => void }) {
+  const { data } = useOverview();
+  const attention = data ? data.attention.approvals.length + data.attention.unanswered.length + data.attention.agents.filter((a) => a.status === 'error').length + data.attention.accounts.length : 0;
+  return (
+    <div className="flex h-12 shrink-0 items-center gap-2 border-b border-zinc-200/80 bg-zinc-100/70 px-2 md:hidden dark:border-white/[0.05] dark:bg-ink-950/80">
+      <button className="relative rounded-lg p-2 text-zinc-600 hover:bg-zinc-200/60 dark:text-zinc-300 dark:hover:bg-white/[0.06]" onClick={onMenu} aria-label="Open menu">
+        <Menu className="size-5" />
+        {attention > 0 && <span className="absolute top-1 right-1 size-2 rounded-full bg-red-500" />}
+      </button>
+      <NavLink to="/" className="flex items-center gap-2">
+        <span className="flex size-7 items-center justify-center rounded-[9px] bg-gradient-to-br from-accent-400 via-accent-500 to-fuchsia-500">
+          <Sparkles className="size-3.5 text-white" />
+        </span>
+        <span className="text-[14px] font-semibold tracking-tight">AgentOS</span>
+      </NavLink>
+    </div>
+  );
+}
+
+function Sidebar({ live, version, open, onClose }: { live: string; version: string; open: boolean; onClose: () => void }) {
   const { data } = useOverview();
   const loc = useLocation();
   const [theme, setTheme] = useTheme();
@@ -77,7 +108,14 @@ function Sidebar({ live, version }: { live: string; version: string }) {
     </NavLink>
   );
   return (
-    <aside className="flex w-[244px] shrink-0 flex-col border-r border-zinc-200/80 bg-zinc-100/70 dark:border-white/[0.05] dark:bg-ink-950/80">
+    <aside
+      className={clsx(
+        'flex w-[244px] shrink-0 flex-col border-r border-zinc-200/80 bg-zinc-100/70 dark:border-white/[0.05] dark:bg-ink-950/80',
+        // Phones: an off-canvas drawer above the page. md and up: the usual fixed column.
+        'max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:w-[min(280px,85vw)] max-md:bg-zinc-100 max-md:shadow-2xl max-md:transition-transform max-md:duration-200 max-md:dark:bg-ink-950',
+        open ? 'max-md:translate-x-0' : 'max-md:-translate-x-full',
+      )}
+    >
       <div className="flex items-center gap-2.5 px-4 pt-5 pb-4">
         <div className="relative flex size-8 items-center justify-center rounded-[10px] bg-gradient-to-br from-accent-400 via-accent-500 to-fuchsia-500 shadow-[0_4px_14px_-4px_rgb(109_106_240/0.7)]">
           <Sparkles className="size-4 text-white" />
@@ -86,6 +124,9 @@ function Sidebar({ live, version }: { live: string; version: string }) {
           <div className="text-[14px] leading-tight font-semibold tracking-tight">AgentOS</div>
           <div className="text-[11px] text-zinc-500">AI team control plane</div>
         </div>
+        <button className="ml-auto rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-200/60 md:hidden dark:hover:bg-white/[0.06]" onClick={onClose} aria-label="Close menu">
+          <X className="size-4" />
+        </button>
       </div>
       <nav className="flex flex-col gap-0.5 px-2.5">
         {nav('/', <LayoutDashboard className="size-4" />, 'Overview', attention)}

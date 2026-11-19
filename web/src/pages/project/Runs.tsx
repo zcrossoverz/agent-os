@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
-import { Wrench, CornerDownRight, AlertTriangle, Info, GitMerge, Square, Bot, ExternalLink, Cloud } from 'lucide-react';
+import { Wrench, CornerDownRight, AlertTriangle, Info, GitMerge, Square, Bot, ExternalLink, Cloud, ChevronLeft } from 'lucide-react';
 import { api, useAction } from '../../lib/api';
 import { useRun, useRunEvents, useRuns } from '../../lib/queries';
 import type { Run, RunEvent } from '../../lib/types';
@@ -19,6 +19,8 @@ export function RunsPage() {
   const runs = useRuns(project.id);
   const agentFilter = params.get('agent');
   const list = (runs.data ?? []).filter((r) => !agentFilter || r.agent_id === agentFilter);
+  // Phones show one pane at a time; the list first, a run once the owner taps it.
+  const [detailOpen, setDetailOpen] = useState(false);
 
   useEffect(() => {
     if (!runId && list.length) nav(`/p/${project.slug}/runs/${list[0].id}${agentFilter ? `?agent=${agentFilter}` : ''}`, { replace: true });
@@ -35,7 +37,7 @@ export function RunsPage() {
 
   return (
     <div className="flex h-full min-h-0">
-      <div className="w-80 shrink-0 overflow-y-auto border-r border-zinc-200 scrollbar-thin dark:border-white/[0.06]">
+      <div className={clsx('w-80 shrink-0 overflow-y-auto border-r border-zinc-200 scrollbar-thin md:block dark:border-white/[0.06]', detailOpen ? 'hidden' : 'block max-md:w-full max-md:border-r-0')}>
         {agentFilter && (
           <div className="flex items-center justify-between border-b border-zinc-200 px-3 py-2 text-xs dark:border-white/[0.06]">
             Runs of {agent(agentFilter)?.name}
@@ -49,7 +51,10 @@ export function RunsPage() {
           return (
             <button
               key={r.id}
-              onClick={() => nav(`/p/${project.slug}/runs/${r.id}${agentFilter ? `?agent=${agentFilter}` : ''}`)}
+              onClick={() => {
+                nav(`/p/${project.slug}/runs/${r.id}${agentFilter ? `?agent=${agentFilter}` : ''}`);
+                setDetailOpen(true);
+              }}
               className={clsx('flex w-full items-start gap-2.5 border-b border-zinc-100 px-3 py-2.5 text-left dark:border-white/[0.05]', r.id === runId ? 'bg-indigo-50/70 dark:bg-indigo-400/[0.07]' : 'hover:bg-zinc-50 dark:hover:bg-white/[0.03]')}
             >
               {r.kind === 'merge' ? <GitMerge className="mt-0.5 size-6 text-zinc-400" /> : <Avatar name={a?.name ?? '?'} seed={a?.id} size="sm" />}
@@ -68,7 +73,12 @@ export function RunsPage() {
           );
         })}
       </div>
-      <div className="min-w-0 flex-1 overflow-y-auto scrollbar-thin">{runId && <RunDetail id={runId} />}</div>
+      <div className={clsx('min-w-0 flex-1 overflow-y-auto scrollbar-thin md:block', detailOpen ? 'block' : 'hidden')}>
+        <button className="flex items-center gap-1 px-3 pt-3 text-sm text-zinc-500 md:hidden" onClick={() => setDetailOpen(false)}>
+          <ChevronLeft className="size-4" /> All runs
+        </button>
+        {runId && <RunDetail id={runId} />}
+      </div>
     </div>
   );
 }
@@ -89,15 +99,15 @@ function RunDetail({ id }: { id: string }) {
   const dur = r.started_at ? ((r.finished_at ? new Date(r.finished_at).getTime() : Date.now()) - new Date(r.started_at).getTime()) / 1000 : null;
 
   return (
-    <div className="px-6 py-5">
+    <div className="px-4 py-4 md:px-6 md:py-5">
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold">{r.kind === 'merge' ? 'Merge run' : `${a?.name ?? 'Agent'} · ${a?.role ?? ''}`}</h2>
+            <h2 className="min-w-0 truncate text-base font-semibold">{r.kind === 'merge' ? 'Merge run' : `${a?.name ?? 'Agent'} · ${a?.role ?? ''}`}</h2>
             <Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge>
             {r.error_kind && <Badge tone="red">{r.error_kind}</Badge>}
           </div>
-          <div className="mt-0.5 text-xs text-zinc-500">
+          <div className="mt-0.5 text-xs break-words text-zinc-500">
             {r.id} · queued {fmtDate(r.queued_at)}
             {dur != null && ` · ${humanDuration(dur)}`}
             {r.focus_task_id && (
@@ -116,7 +126,7 @@ function RunDetail({ id }: { id: string }) {
             <Cloud className="size-3.5" /> Open cloud session <ExternalLink className="size-3" />
           </a>
         )}
-        {(r.status === 'running' || r.status === 'queued') && !r.session_url && (
+        {(r.status === 'running' || r.status === 'queued') && (
           <button className="btn btn-sm" onClick={() => cancel.mutate()}>
             <Square className="size-3.5" /> Cancel
           </button>
