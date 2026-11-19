@@ -1,95 +1,172 @@
+<div align="center">
+
+<img src="web/public/favicon.svg" width="72" height="72" alt="AgentOS logo" />
+
 # AgentOS
 
-**Manage a team of AI coding agents like a software team, without being the message broker between them.**
+**Run a team of AI coding agents like a software team, and stop being the message broker between them.**
 
-AgentOS is the orchestration layer above existing coding agents. You create projects, connect your coding-agent subscriptions (initially Claude Code on Pro/Max), and appoint an AI Project Manager. You describe what you want in plain language. The PM plans the work, breaks it into tasks, assigns them to agents, and coordinates reviews. AgentOS merges approved work and escalates important decisions to you. Everything is tracked in a web dashboard and persisted outside any agent's memory.
+You talk to an AI project manager. It plans, splits the work into tasks, hands them to Claude Code agents running on *your own subscriptions*, gets the work reviewed and merges it. You approve what matters from a dashboard.
 
-> Status: **v0.1, working end to end.** Runner mode is verified with real Claude Code agents on a subscription login. Cloud mode is verified against simulated Claude Code on the web and GitHub APIs, with its key assumptions checked by experiment. It also has a 34-test suite and a scripted browser walkthrough. See [docs/verification.md](docs/verification.md).
+[![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0-6d6af0?style=flat-square)](LICENSE)
+[![Node 22.13+](https://img.shields.io/badge/node-22.13%2B-3c873a?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
+[![Claude Code](https://img.shields.io/badge/agents-Claude%20Code-d97757?style=flat-square)](https://code.claude.com/docs)
+[![Tests](https://img.shields.io/badge/tests-35%20passing-22c55e?style=flat-square)](docs/verification.md)
+[![Status](https://img.shields.io/badge/status-v0.1-f59e0b?style=flat-square)](docs/roadmap.md)
+
+[Quick start](#-quick-start) · [How it works](#-how-it-works) · [Cloud mode](docs/cloud.md) · [Deploy](docs/operations.md) · [Architecture](docs/architecture.md) · [Roadmap](docs/roadmap.md)
+
+<img src="docs/screenshots/chat.png" alt="Talking to the AI project manager in the AgentOS dashboard" width="900" />
+
+</div>
+
+---
+
+## Why AgentOS
+
+Running several coding agents at once turns you into a switchboard: copy this plan to that agent, paste the review back, remember who is doing what, merge by hand. AgentOS takes that job.
+
+- 🧑‍💼 **An AI PM in charge.** Describe the goal in plain language. The PM writes the plan, creates epics, tasks and acceptance criteria, and assigns them.
+- 🤝 **Agents talk to each other through AgentOS, not through you.** Messages, task threads, a team channel, @mentions, reviews and approvals all go through one tool channel (MCP).
+- 💳 **Your subscriptions, not an API bill.** Agents are the unmodified Claude Code CLI, signed in to your own Pro/Max accounts. A billing guard stops any run that would quietly switch to API billing.
+- 🧠 **State outside any agent's memory.** Projects, tasks, decisions, docs and run history live in AgentOS's database. A fresh session picks up exactly where the last one stopped.
+- 🛡️ **You keep the final say.** Paused, supervised or autonomous per project. Risky actions (force-push, deletes, deploys, credential access) become approval requests.
+
+## ✨ Features
+
+| | |
+|---|---|
+| **Projects and teams** | Several projects, each with its own agents: PM, developers, reviewer, tester. Roles are free text. |
+| **Task management** | Epics, tasks, subtasks, dependencies with cycle checks and auto-unblock, a Kanban board, review and changes-requested loops. |
+| **Git you can trace** | One branch per task, commits attributed to agents and tasks, reviewed work merged by AgentOS. Conflicts go back to the author. |
+| **Approvals and a permission gate** | Agents must ask before architectural, security, destructive or production-impacting actions. Risky tool calls are intercepted and wait for you. |
+| **Guardrails** | Loop guard for agent ping-pong, hourly run budgets, per-account concurrency, bounded auto-continuation, a global pause. |
+| **Reliability** | Usage limits pause an account until its window resets. Lost or crashed runs hand their work back. Sessions resume when possible and rebuild context when not. |
+| **Dashboard** | Attention center, board, task detail, chat, agents, approvals and decision log, runs with live logs and "why it ran", activity, docs, git, settings. Works on phones too. |
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/overview.png" alt="Attention center" /><p align="center"><sub><b>Attention center</b>: what needs you, at a glance</sub></p></td>
+    <td width="50%"><img src="docs/screenshots/task.png" alt="Task detail" /><p align="center"><sub><b>Task detail</b>: review, branch, commits, discussion</sub></p></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/runs.png" alt="Runs with live logs" /><p align="center"><sub><b>Runs</b>: live log and why each run started</sub></p></td>
+    <td width="50%"><img src="docs/screenshots/board.png" alt="Kanban board" /><p align="center"><sub><b>Board</b>: agents move their own cards</sub></p></td>
+  </tr>
+</table>
+
+## 🧭 How it works
 
 ![Workflow](docs/workflow.svg)
 
-| Talk to your PM | Attention center |
-|---|---|
-| ![Chat with the PM](docs/screenshots/chat.png) | ![Overview](docs/screenshots/overview.png) |
-| **Task detail: review, branch, commits, discussion** | **Runs: live log and "why it ran"** |
-| ![Task](docs/screenshots/task.png) | ![Runs](docs/screenshots/runs.png) |
+```
+ Browser (dashboard) ──HTTPS──►  Control plane (your VPS)                Agents
+                                 ├ REST API + live updates (SSE)         ├ Cloud mode: Claude Code on the web sessions,
+                                 ├ Scheduler: who runs next, guards      │   one per wake-up, on each account
+                                 ├ MCP endpoint /mcp (per-run auth)  ◄───┤ Runner mode: `claude -p` on your VPS or machine,
+                                 └ SQLite: projects, tasks, messages,    │   one git worktree per agent
+                                   approvals, runs, decisions, docs      └ both call AgentOS tools over MCP
+```
 
-## Two ways to run agents
+### Two ways to run agents
 
-| | **Cloud mode** (Claude Code on the web) | **Runner mode** (Claude Code CLI) |
+| | ☁️ **Cloud mode** | 🖥️ **Runner mode** |
 |---|---|---|
-| Where agents run | Anthropic's cloud: each wake-up is a claude.ai/code session on that agent's account | On a runner: your VPS or your machine |
-| Workspace | Your GitHub repository (agents push task branches) | Local git worktrees on the runner |
-| How AgentOS starts work | The account's routine API trigger | `claude -p` headless on the runner |
-| Merges | GitHub API | Local clone (optionally pushed) |
-| Setup guide | [docs/cloud.md](docs/cloud.md) | [docs/operations.md](docs/operations.md) |
+| Where agents run | Anthropic's cloud. Each wake-up is a claude.ai/code session on that agent's account | Your VPS or your own machine |
+| Workspace | Your GitHub repository; agents push task branches | Local git worktrees on the runner |
+| How AgentOS starts work | The account's routine API trigger | `claude -p` headless |
+| Merges | GitHub API | Local clone, optionally pushed |
+| Good for | No machine to keep busy; any repo on GitHub | Repos that need local tools (SDKs, engines, GPUs) |
+| Setup | [docs/cloud.md](docs/cloud.md) | [docs/operations.md](docs/operations.md) |
 
-Both modes use the same PM, tasks, messages, approvals, guardrails and dashboard. Each agent's subscription pays for its own sessions.
+Both modes share the same PM, tasks, messages, approvals, guardrails and dashboard. Each agent's own subscription pays for its sessions.
 
-## What works today
+## 🚀 Quick start
 
-- **Projects and teams:** multiple projects, each with configurable agents (PM, developers, reviewer, tester…). Roles are free text with presets.
-- **PM-led or collaborative coordination**, with the owner as final authority. Autonomy is set per project: *paused*, *supervised* (you approve plans and merges) or *autonomous* (within guardrails).
-- **Agents talk through AgentOS, not through you:** messages, task threads, a team channel, @mentions and a read-only view of agent-to-agent conversations.
-- **Task management:** epics, tasks and subtasks, dependencies (cycle-checked, with auto-unblock), acceptance criteria, a Kanban board, review and changes-requested loops.
-- **Git you can trace:** one worktree per agent, one branch per task, commits attributed to agents and tasks. Reviewed work is merged into the base branch by AgentOS (conflicts go back to the author), optionally pushed.
-- **Approvals:** agents must ask before architectural, security, destructive or production-impacting actions. A **permission gate** intercepts risky tool calls (force-push, `rm -rf /`, deploys, credential access…), turns them into approval requests, and grants a one-off permission when you approve.
-- **Guardrails:** loop guard for agent ping-pong, hourly run budgets, bounded auto-continuation with escalation, per-account concurrency, and a global pause.
-- **Reliability:** all state lives in AgentOS's database. Runs resume the agent's previous Claude session when possible and rebuild context from project state when not. Usage limits pause an account until its window resets. Crashed or lost runs hand their work back.
-- **Dashboard:** attention center, project overview, board, task detail, chat, agents, approvals and decision log, runs with live logs and "why it ran", activity timeline, docs, git, settings, and accounts & runners.
-
-## Subscription, not API billing
-
-AgentOS runs the **unmodified Claude Code CLI** in headless mode, signed in with **your own subscription** through Anthropic's own login flow. AgentOS never sees, stores or relays your Claude credentials. A layered **billing guard** makes sure a run can't quietly switch to API billing. That could otherwise happen through a stray `ANTHROPIC_API_KEY`, or an `apiKeyHelper` in a repository's `.claude/settings.json` (verified by experiment). The guard allow-lists the environment, ignores repo settings, preflights `claude auth status`, and has a runtime tripwire on the stream's `apiKeySource`. Details and the terms analysis are in [docs/feasibility.md](docs/feasibility.md).
-
-## Quick start (local)
-
-Requirements: Node 22.13+, git, and the [Claude Code CLI](https://code.claude.com/docs) for real agents.
+Requirements: **Node 22.13+**, **git**, and the [Claude Code CLI](https://code.claude.com/docs) for real agents.
 
 ```bash
+git clone https://github.com/zcrossoverz/agent-os.git
+cd agent-os
 npm install
-npm run build                     # builds the dashboard and the server
-cd server
-node dist/cli.js server --embedded-runner --seed-demo
-# → prints the initial dashboard password; open http://127.0.0.1:4600
+npm run build
+node server/dist/cli.js server --embedded-runner --seed-demo
+# prints the initial dashboard password, then open http://127.0.0.1:4600
 ```
 
-`--seed-demo` creates **Demo Shop**, a project staffed by *mock* agents (no usage spent). Tell its PM "Please build: - product catalog API - cart page" and watch the plan, implementation, review and merge happen.
+`--seed-demo` creates **Demo Shop**, a project staffed by *mock* agents, so nothing touches your usage. Tell its PM:
 
-To use real Claude agents:
+> Please build: - product catalog API - cart page
 
-1. **Accounts & runners → Add account** (provider: Claude Code). Add one per subscription, e.g. your two Max accounts.
-2. Click **Sign-in instructions** and run the shown command on the runner machine. For the embedded runner that's the server host:
-   ```bash
-   CLAUDE_CONFIG_DIR='<shown dir>' claude auth login --claudeai
-   ```
-3. Wait for the status to show **Ready** (the runner confirmed a subscription login with no API key).
-4. Create a project, add agents bound to those accounts, appoint a PM, and talk to the PM.
+and watch the plan, the implementation, the review and the merge happen on the board.
 
-Development mode (hot reload): `npm run dev` (server on :4600) and `npm run dev -w web` (dashboard on :5173 with API proxy).
+### Use real Claude agents
 
-## Architecture in one picture
+1. **Accounts & runners → Add account.** Add one per Claude subscription.
+2. **Sign in** with the command the dashboard shows. It is Anthropic's own login flow, so AgentOS never sees your credentials.
+3. Wait for **Ready**. The runner has confirmed a subscription login with no API key in play.
+4. **Create a project**, add agents bound to those accounts, make one of them the PM, and start talking.
 
-```
- Browser (dashboard) ──HTTPS──►  Control plane (VPS)                     Runner(s): VPS or your machines
-                                 ├ REST API + SSE                        ├ long-poll for runs (outbound only)
-                                 ├ Scheduler (who runs next, guards)  ◄──┤ git: repo clone + worktree per agent
-                                 ├ MCP endpoint /mcp (per-run token)  ◄──┤ claude -p … (unmodified CLI, your login)
-                                 └ SQLite: projects, tasks, messages,    │   └─ calls AgentOS tools over MCP
-                                   approvals, runs, decisions, docs      └ billing guard, permission gate
-```
+Prefer agents in the cloud? Follow the [cloud mode guide](docs/cloud.md). It takes about ten minutes per account.
 
-Read more: [cloud mode](docs/cloud.md) · [architecture](docs/architecture.md) · [operations & deployment](docs/operations.md) · [roadmap](docs/roadmap.md) · [feasibility & terms](docs/feasibility.md) · [verification](docs/verification.md)
+### Deploy
 
-## Tests
+One container runs the control plane, the dashboard and an embedded runner:
 
 ```bash
-npm test                                             # 34 tests: e2e runner mode (mock agents, real git + MCP), e2e cloud mode (simulated routines + GitHub), driver, billing guard, policy, orchestration
-AGENTOS_REAL_CLAUDE=1 npm test -w server -- test/real-claude.smoke.test.ts   # live run with real Claude Code (uses a little real usage)
+docker compose -f deploy/docker-compose.yml up -d --build
 ```
 
-## Decisions that need you (the owner)
+Put TLS in front with the included [Caddyfile](deploy/Caddyfile) or nginx. systemd units are in [`deploy/`](deploy/). Details: [operations guide](docs/operations.md).
 
-1. **Terms judgement.** Anthropic's terms allow signing in to the unmodified Claude Code CLI with your own subscription. They also say advertised limits assume "ordinary, individual usage". Whether orchestrated, mostly autonomous use of two personal Max accounts fits that is your call (see [feasibility](docs/feasibility.md#terms-and-credential-handling)). AgentOS keeps you in control: concurrency 1 per account by default, run budgets, pause, and supervised mode.
-2. **Where runners live.** You can run one runner on the VPS next to the server (simplest), or runners on your own machines (credentials never leave them). Agents of one project currently share one runner, because they share git worktrees.
-3. **GitHub token scope.** Cloud mode needs a fine-grained token with *Contents: read and write* on the project repository, so AgentOS can merge reviewed branches. Protect the base branch on GitHub if you want an extra safety net.
+## 💳 Subscription, not API billing
+
+AgentOS runs the **unmodified Claude Code CLI**, signed in with **your own subscription** through Anthropic's login flow. It never sees, stores or relays your Claude credentials.
+
+A run can silently fall back to API billing through a stray `ANTHROPIC_API_KEY`, or through an `apiKeyHelper` in a repository's `.claude/settings.json` (verified by experiment). The billing guard closes both: it builds the agent's environment from an allow-list, ignores repo-level settings, preflights `claude auth status` and kills a run whose stream reports any API key source. The full analysis is in [docs/feasibility.md](docs/feasibility.md).
+
+> [!IMPORTANT]
+> Anthropic's terms allow signing in to the unmodified Claude Code CLI with your own subscription, and also say that advertised limits assume ordinary, individual usage. Whether an orchestrated, mostly autonomous setup fits your plan is your call. AgentOS keeps you in control with concurrency 1 per account by default, run budgets, pause and supervised mode. See [feasibility & terms](docs/feasibility.md#terms-and-credential-handling).
+
+## ✅ Verified, not just written
+
+- **35 automated tests**: end-to-end runner mode with mock agents over real git and MCP, end-to-end cloud mode against simulated routine and GitHub APIs, the driver, the billing guard, policies and orchestration.
+- **Live runs**: runner mode with real Claude Code agents on a subscription login, and cloud mode with real routine-fired Claude Code on the web sessions working against a deployed AgentOS.
+- **Scripted browser walkthrough** of the dashboard.
+
+```bash
+npm test                                                                         # the full suite
+AGENTOS_REAL_CLAUDE=1 npm test -w server -- test/real-claude.smoke.test.ts      # one live run (uses a little real usage)
+```
+
+Details and the evidence behind each claim: [docs/verification.md](docs/verification.md).
+
+## 🗺️ Roadmap
+
+- [x] Core orchestration, dashboard, approvals, guardrails, billing guard
+- [x] Runner mode and cloud mode
+- [x] Docker deployment
+- [ ] A pull request per task, with CI status and auto-fix
+- [ ] Projects spread over several runners
+- [ ] Codex CLI and Gemini CLI drivers
+- [ ] Per-agent sandboxing and network policy
+- [ ] Usage-aware account balancing and notifications
+
+The full plan and known limitations: [docs/roadmap.md](docs/roadmap.md).
+
+## 🤝 Contributing
+
+Issues and pull requests are welcome. For development with hot reload:
+
+```bash
+npm run dev            # server on :4600 with an embedded runner
+npm run dev -w web     # dashboard on :5173, proxying the API
+```
+
+Run `npm test` and `npm run typecheck` before opening a PR.
+
+If AgentOS saves you from copy-pasting between agents, a ⭐ helps other people find it.
+
+## License
+
+[AGPL-3.0](LICENSE). You can use, change and self-host AgentOS freely. If you offer a modified version to others as a network service, you must share your changes under the same license.

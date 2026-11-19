@@ -65,9 +65,12 @@ Then add agents to the project bound to these accounts (e.g. PM + backend on Max
 | `CLAUDE_CODE_REMOTE_SESSION_ID` (`cse_01…`) matches the session ID the API returns (`session_01…`) once the prefix is removed | Observed inside a real cloud session |
 | The full flow (dispatch, check-in, coordination, push check, GitHub merge, watchdog, 429/401 handling, token and session security) | `test/cloud.test.ts`, with a simulated routine API, simulated cloud sessions and a GitHub API over real git |
 
-**Not yet verified end to end:** a real routine-fired session calling a real AgentOS deployment. Specifically:
+**Verified live:** routine-fired sessions on real Claude accounts reached a deployed AgentOS over MCP, ran AgentOS tools without an approval prompt (the network secret was attached by the proxy and `.claude/settings.json` pre-allowed `mcp__agentos`), created tasks and finished their runs.
 
-- that the network secret is attached to MCP requests from Claude Code in the VM, which is how the docs describe proxy behaviour for listed hosts;
-- that routine sessions run AgentOS MCP tools without an approval prompt. `.claude/settings.json` pre-allows `mcp__agentos`. If a session waits for approval, the watchdog reports it and the session link shows the prompt.
+## Troubleshooting
 
-Running the setup above once with a small task confirms both. Debug with **Runs → Open cloud session**.
+- **"The AgentOS tools aren't connected" / the run never calls `start_run`.** A cloud session clones the repository's **default branch**, and `.mcp.json` must be on that branch when the session starts. **Set up repository** commits it to the project's base branch, so make the base branch the repository's default branch on GitHub (or pick that branch in the routine). Your AgentOS access log shows no `/mcp` requests at all in this case.
+- **Requests reach `/mcp` but are rejected.** Check the environment's network secret: host = your AgentOS domain, header `Authorization`, prefix `Bearer`, value = that account's AgentOS token.
+- **A run is stuck in "running" after its session died.** Use **Cancel** on the run; cloud runs end immediately and their messages go back to the agent's inbox. Otherwise the watchdog fails it after 30 minutes without AgentOS calls.
+
+Debug any run with **Runs → Open cloud session**.
