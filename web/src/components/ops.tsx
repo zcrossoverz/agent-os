@@ -75,11 +75,15 @@ export function KpiTile({ label, value, unit, sub, d, spark, sparkLabel, tone }:
         {label}
       </div>
       <div className="flex items-end justify-between gap-2">
-        <div className="min-w-0 text-[26px] leading-none font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+        <div className="shrink-0 text-[26px] leading-none font-semibold tracking-tight whitespace-nowrap text-zinc-900 dark:text-zinc-50">
           {value}
           {unit && <span className="ml-0.5 text-[14px] font-medium text-zinc-500">{unit}</span>}
         </div>
-        {spark && <Sparkline values={spark} label={sparkLabel ?? `${label} trend`} />}
+        {spark && (
+          <div className="flex min-w-0 justify-end overflow-hidden">
+            <Sparkline values={spark} width={72} label={sparkLabel ?? `${label} trend`} />
+          </div>
+        )}
       </div>
       <div className="flex min-h-4 items-center gap-1 text-[11px] text-zinc-500">
         {d ? (
@@ -528,7 +532,7 @@ export function AgentBlotter({ m, ops, slugOf }: { m: Metrics; ops: Ops; slugOf:
                 <td className={clsx(td, 'num text-right')}>{r.runs}</td>
                 <td className={clsx(td, 'num text-right')}>
                   {r.rate === null ? <span className="text-zinc-400">—</span> : `${Math.round(r.rate * 100)}%`}
-                  {r.failed > 0 && <span className="ml-1 text-red-600 dark:text-red-400">({r.failed}✕)</span>}
+                  {r.failed > 0 && <span className="ml-1.5 text-red-600 dark:text-red-400">{r.failed} failed</span>}
                 </td>
                 <td className={td}>
                   <div className="flex items-center gap-2" title={`${fmtDuration(r.busy)} busy (${Math.round(r.util * 100)}% of the window)`}>
