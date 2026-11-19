@@ -9,7 +9,8 @@
 | M2 | **Dashboard**: overview and attention center, accounts and runners, project overview, board, task drawer, chat, agents, approvals and decision log, runs with live logs, activity, knowledge, git, settings | ✅ Done |
 | M3 | **Verification**: unit, e2e (mock agents with real git and MCP), live smoke test with real Claude Code on a subscription, scripted browser walkthrough | ✅ Done ([verification.md](verification.md)) |
 | M4 | **Deployment**: Dockerfile, compose, Caddy, systemd units, operations guide | ✅ Written. ⚠️ The Docker image hasn't been built here (no Docker daemon in the dev environment); the systemd units follow the same commands that were tested by hand |
-| M5 | **GitHub integration**: push task branches, open PRs per task, PR links on tasks, CI status from checks, merge through PRs instead of locally | ⏳ Next |
+| M4b | **Cloud mode**: agents as Claude Code on the web sessions through each account's routine API trigger, GitHub as the shared workspace, merges with the GitHub API, session-bound MCP auth via network secrets | ✅ Built and tested against simulated Anthropic and GitHub APIs ([cloud.md](cloud.md)). ⚠️ Needs one live run on your VPS and accounts to confirm the two unverified points listed there |
+| M5 | **GitHub PRs**: open a PR per task (instead of direct merges), PR links on tasks, CI status from checks, auto-fix on CI failure | ⏳ Next |
 | M6 | **Multi-runner projects**: shared remote as the hand-off point between runners, so one project can use accounts on different machines | ⏳ Planned |
 | M7 | **More providers**: Codex CLI and Gemini CLI drivers (MCP + headless JSON output), per-provider billing guards | ⏳ Planned |
 | M8 | **Stronger isolation**: per-agent OS user or container sandbox, network policy per agent | ⏳ Planned |
@@ -29,4 +30,5 @@
 
 ## Progress log
 
+- **2026-11-19:** Cloud mode. Researched Claude Code on the web automation: the routine API trigger, cloud environments and network secrets, `.mcp.json` in cloud sessions, the GitHub proxy. Verified by experiment that `.mcp.json` header env expansion works and that the cloud session ID formats match. Built the claude-cloud provider, GitHub workspace mode, cloud dashboard flows, and an e2e test with simulated APIs.
 - **2026-11-18:** Feasibility experiments against Claude Code 2.1.327: headless stream-json, `apiKeySource`, API-key and repo-`apiKeyHelper` traps, `--setting-sources user`, resume, HTTP MCP with bearer header, permission prompt tool. Core server, runner, drivers, scheduler and MCP tools built. E2E with mock agents passing. Live smoke test with real Claude agents (Haiku) passing after fixing three issues it found: mention routing, owner-reply scoping, and completion robustness. Dashboard built and walked through in a headless browser, which found two more issues: static asset serving and repeat reviews of approved tasks.

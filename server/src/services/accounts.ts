@@ -46,10 +46,10 @@ export class AccountService {
     if (!input.name?.trim()) throw badRequest('Account name is required');
     if (!PROVIDERS.includes(input.provider)) throw badRequest(`Unsupported provider ${input.provider}`);
     const cloud = input.provider === 'claude-cloud';
-    if (cloud) {
-      if (!input.fire_url?.trim() || !input.fire_token?.trim()) throw badRequest('A cloud account needs the routine API trigger URL and its token (claude.ai/code/routines → your routine → API trigger)');
-      validateFireUrl(input.fire_url);
-    }
+    // A cloud account can be created before its routine exists: the routine's environment needs the
+    // AgentOS token that creating the account produces. The trigger is added afterwards.
+    const hasTrigger = cloud && !!input.fire_url?.trim() && !!input.fire_token?.trim();
+    if (cloud && input.fire_url?.trim()) validateFireUrl(input.fire_url);
     const runnerId = cloud ? null : (input.runner_id ?? this.core.runners.defaultRunnerId());
     const id = newId('acc');
     let configDir = cloud ? null : input.config_dir?.trim() || null;
@@ -65,10 +65,11 @@ export class AccountService {
       provider: input.provider,
       runner_id: runnerId,
       config_dir: configDir,
-      status: input.provider === 'mock' || cloud ? 'ready' : 'unknown',
+      status: input.provider === 'mock' || hasTrigger ? 'ready' : cloud ? 'auth_required' : 'unknown',
+      status_detail: cloud && !hasTrigger ? 'Routine trigger not set yet: add the Fire URL and token from claude.ai/code/routines' : null,
       max_concurrent_runs: Math.max(1, Math.min(input.max_concurrent_runs ?? (cloud ? 2 : 1), 8)),
-      fire_url: cloud ? input.fire_url!.trim() : null,
-      fire_token_enc: cloud ? this.core.secrets.encrypt(input.fire_token!.trim()) : null,
+      fire_url: cloud && input.fire_url?.trim() ? input.fire_url.trim() : null,
+      fire_token_enc: cloud && input.fire_token?.trim() ? this.core.secrets.encrypt(input.fire_token.trim()) : null,
       cloud_token_hash: cloudToken ? sha256(cloudToken) : null,
       created_at: now,
       updated_at: now,
@@ -91,7 +92,8 @@ export class AccountService {
       row.fire_token_enc = this.core.secrets.encrypt(fire_token.trim());
     }
     this.db.update('accounts', id, row);
-    if (fire_token && ['auth_required', 'error'].includes(acc.status)) this.setStatus(id, 'ready', 'Routine token updated');
+    const after = this.get(id);
+    if (after.provider === 'claude-cloud' && after.fire_url && after.has_fire_token && ['auth_required', 'error'].includes(acc.status)) this.setStatus(id, 'ready', 'Routine trigger set');
     this.core.bus.change({ topic: 'accounts', id });
     this.core.bus.kick();
     return this.get(id);

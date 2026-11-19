@@ -86,7 +86,8 @@ export class RunService {
         trigger: input.trigger,
         focus_task_id: input.focusTask?.id ?? null,
         session_key: input.sessionKey,
-        resume_session_id: session?.provider_session_id ?? null,
+        // Cloud runs always start a fresh Claude Code on the web session (context comes from AgentOS).
+        resume_session_id: account.provider === 'claude-cloud' ? null : (session?.provider_session_id ?? null),
         prompt: input.prompt,
         payload: JSON.stringify({ recovery: input.recovery, inbox: input.items.map((i) => i.id) }),
         owner_reply_conversation_id: input.ownerReplyConversationId,

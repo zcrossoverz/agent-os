@@ -22,20 +22,21 @@ export function NewProjectPage() {
   const runners = useRunners();
   const meta = useMeta();
   const presets = meta.data?.rolePresets ?? {};
-  const [form, setForm] = useState({ name: '', key: '', description: '', repo_url: '', base_branch: 'main', runner_id: '', coordination_mode: 'pm_led', autonomy: 'supervised', merge_policy: 'auto' });
+  const [form, setForm] = useState({ name: '', key: '', description: '', repo_url: '', base_branch: 'main', runner_id: '', coordination_mode: 'pm_led', autonomy: 'supervised', merge_policy: 'auto', workspace_mode: 'github', github_token: '' });
   const [team, setTeam] = useState<AgentDraft[]>([
     { name: 'Ada', preset: 'pm', role: 'Project Manager', account_id: '', is_pm: true, model: '' },
     { name: 'Linus', preset: 'backend', role: 'Backend Developer', account_id: '', is_pm: false, model: '' },
     { name: 'Rex', preset: 'reviewer', role: 'Code Reviewer', account_id: '', is_pm: false, model: '' },
   ]);
   const [busy, setBusy] = useState(false);
-  const accs = accounts.data ?? [];
+  const accs = (accounts.data ?? []).filter((a) => (form.workspace_mode === 'github' ? a.provider === 'claude-cloud' : a.provider !== 'claude-cloud'));
   const defaultAcc = (i: number) => accs[i % Math.max(1, accs.length)]?.id ?? '';
 
   const submit = async () => {
     setBusy(true);
     try {
-      const p = await api('POST', '/api/projects', { ...form, key: form.key || undefined, repo_url: form.repo_url || null, runner_id: form.runner_id || undefined });
+      const { github_token, ...rest } = form;
+      const p = await api('POST', '/api/projects', { ...rest, key: form.key || undefined, repo_url: form.repo_url || null, runner_id: form.runner_id || undefined, ...(github_token ? { github_token } : {}) });
       for (const [i, a] of team.entries()) {
         const preset = presets[a.preset];
         await api('POST', `/api/projects/${p.id}/agents`, {
@@ -74,8 +75,19 @@ export function NewProjectPage() {
         <Field label="Description / brief" hint="What the project is and what matters. The PM refines this into the project brief.">
           <textarea className="input min-h-24" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
         </Field>
+        <Field label="Where agents work">
+          <select className="input" value={form.workspace_mode} onChange={(e) => setForm({ ...form, workspace_mode: e.target.value })}>
+            <option value="github">GitHub repository: agents run as Claude Code on the web sessions</option>
+            <option value="runner">Runner: agents run the Claude Code CLI on your VPS or machine</option>
+          </select>
+        </Field>
+        {form.workspace_mode === 'github' && (
+          <Field label="GitHub token" hint="Fine-grained token with Contents: read & write on the repository (used to merge reviewed branches). Stored encrypted. You can add it later in Settings.">
+            <input type="password" className="input font-mono text-xs" value={form.github_token} onChange={(e) => setForm({ ...form, github_token: e.target.value })} placeholder="github_pat_…" autoComplete="off" />
+          </Field>
+        )}
         <div className="grid gap-4 sm:grid-cols-[1fr_10rem]">
-          <Field label="Repository (optional)" hint="Git URL or a path on the runner to clone from. Leave empty to start a fresh repository.">
+          <Field label={form.workspace_mode === 'github' ? 'GitHub repository' : 'Repository (optional)'} hint={form.workspace_mode === 'github' ? 'https://github.com/owner/repo. The Claude GitHub App must be installed on it for each account.' : 'Git URL or a path on the runner to clone from. Leave empty to start a fresh repository.'}>
             <input className="input font-mono text-xs" value={form.repo_url} onChange={(e) => setForm({ ...form, repo_url: e.target.value })} placeholder="git@github.com:you/repo.git" />
           </Field>
           <Field label="Base branch">
@@ -112,7 +124,7 @@ export function NewProjectPage() {
       <h2 className="mb-2 text-sm font-semibold">Team</h2>
       {accs.length === 0 && (
         <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-          No accounts yet. Agents need an account to run. Add one under Accounts & runners (you can assign it later).
+          {form.workspace_mode === 'github' ? 'No cloud accounts yet. Add your Claude accounts as “Claude Code on the web” under Accounts & runners (you can assign them later).' : 'No runner accounts yet. Add one under Accounts & runners (you can assign it later).'}
         </div>
       )}
       <div className="card mb-6 divide-y divide-zinc-100 dark:divide-zinc-800">

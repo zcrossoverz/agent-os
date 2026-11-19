@@ -4,7 +4,7 @@
 
 AgentOS is the orchestration layer above existing coding agents. You create projects, connect your coding-agent subscriptions (initially Claude Code on Pro/Max), and appoint an AI Project Manager. You describe what you want in plain language. The PM plans the work, breaks it into tasks, assigns them to agents, and coordinates reviews. AgentOS merges approved work and escalates important decisions to you. Everything is tracked in a web dashboard and persisted outside any agent's memory.
 
-> Status: **v0.1, working end to end.** It has been verified with real Claude Code agents on a subscription login, a 32-test suite and a scripted browser walkthrough. See [docs/verification.md](docs/verification.md).
+> Status: **v0.1, working end to end.** Runner mode is verified with real Claude Code agents on a subscription login. Cloud mode is verified against simulated Claude Code on the web and GitHub APIs, with its key assumptions checked by experiment. It also has a 34-test suite and a scripted browser walkthrough. See [docs/verification.md](docs/verification.md).
 
 ![Workflow](docs/workflow.svg)
 
@@ -13,6 +13,18 @@ AgentOS is the orchestration layer above existing coding agents. You create proj
 | ![Chat with the PM](docs/screenshots/chat.png) | ![Overview](docs/screenshots/overview.png) |
 | **Task detail: review, branch, commits, discussion** | **Runs: live log and "why it ran"** |
 | ![Task](docs/screenshots/task.png) | ![Runs](docs/screenshots/runs.png) |
+
+## Two ways to run agents
+
+| | **Cloud mode** (Claude Code on the web) | **Runner mode** (Claude Code CLI) |
+|---|---|---|
+| Where agents run | Anthropic's cloud: each wake-up is a claude.ai/code session on that agent's account | On a runner: your VPS or your machine |
+| Workspace | Your GitHub repository (agents push task branches) | Local git worktrees on the runner |
+| How AgentOS starts work | The account's routine API trigger | `claude -p` headless on the runner |
+| Merges | GitHub API | Local clone (optionally pushed) |
+| Setup guide | [docs/cloud.md](docs/cloud.md) | [docs/operations.md](docs/operations.md) |
+
+Both modes use the same PM, tasks, messages, approvals, guardrails and dashboard. Each agent's subscription pays for its own sessions.
 
 ## What works today
 
@@ -67,12 +79,12 @@ Development mode (hot reload): `npm run dev` (server on :4600) and `npm run dev 
                                    approvals, runs, decisions, docs      └ billing guard, permission gate
 ```
 
-Read more: [architecture](docs/architecture.md) · [operations & deployment](docs/operations.md) · [roadmap](docs/roadmap.md) · [feasibility & terms](docs/feasibility.md) · [verification](docs/verification.md)
+Read more: [cloud mode](docs/cloud.md) · [architecture](docs/architecture.md) · [operations & deployment](docs/operations.md) · [roadmap](docs/roadmap.md) · [feasibility & terms](docs/feasibility.md) · [verification](docs/verification.md)
 
 ## Tests
 
 ```bash
-npm test                                             # 31 tests: e2e (mock agents, real git + MCP), driver, billing guard, policy, orchestration
+npm test                                             # 34 tests: e2e runner mode (mock agents, real git + MCP), e2e cloud mode (simulated routines + GitHub), driver, billing guard, policy, orchestration
 AGENTOS_REAL_CLAUDE=1 npm test -w server -- test/real-claude.smoke.test.ts   # live run with real Claude Code (uses a little real usage)
 ```
 
@@ -80,4 +92,4 @@ AGENTOS_REAL_CLAUDE=1 npm test -w server -- test/real-claude.smoke.test.ts   # l
 
 1. **Terms judgement.** Anthropic's terms allow signing in to the unmodified Claude Code CLI with your own subscription. They also say advertised limits assume "ordinary, individual usage". Whether orchestrated, mostly autonomous use of two personal Max accounts fits that is your call (see [feasibility](docs/feasibility.md#terms-and-credential-handling)). AgentOS keeps you in control: concurrency 1 per account by default, run budgets, pause, and supervised mode.
 2. **Where runners live.** You can run one runner on the VPS next to the server (simplest), or runners on your own machines (credentials never leave them). Agents of one project currently share one runner, because they share git worktrees.
-3. **GitHub integration scope.** Pushing merged work and opening PRs needs a token with repo scope on the runner. Not enabled by default (see roadmap).
+3. **GitHub token scope.** Cloud mode needs a fine-grained token with *Contents: read and write* on the project repository, so AgentOS can merge reviewed branches. Protect the base branch on GitHub if you want an extra safety net.

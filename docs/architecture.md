@@ -8,6 +8,7 @@ AgentOS is a **control plane** for coding agents. It doesn't contain an agent. I
 |---|---|---|
 | **Control plane** (`server/src/http`, `services`, `orchestrator`) | VPS | REST API and SSE for the dashboard, scheduler, MCP endpoint for agents, runner protocol, SQLite database |
 | **Runner** (`server/src/runner`) | VPS and/or your machines | Executes runs for the accounts signed in on that machine: git worktrees, billing guard, provider drivers. Outbound HTTP only. |
+| **Cloud worker** (`orchestrator/cloud.ts`) | control plane | Cloud mode: fires account routines to start Claude Code on the web sessions, merges through the GitHub API, watches quiet sessions ([cloud.md](cloud.md)) |
 | **Drivers** (`runner/drivers`) | inside a runner | `claude-code` (unmodified CLI, headless) and `mock` (deterministic scripted agent for tests and demos). Codex and Gemini are planned as additional drivers. |
 | **Dashboard** (`web/`) | served by the control plane | React SPA, live through SSE |
 

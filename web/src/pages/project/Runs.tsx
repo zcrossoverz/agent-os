@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
-import { Wrench, CornerDownRight, AlertTriangle, Info, GitMerge, Square, Bot } from 'lucide-react';
+import { Wrench, CornerDownRight, AlertTriangle, Info, GitMerge, Square, Bot, ExternalLink, Cloud } from 'lucide-react';
 import { api, useAction } from '../../lib/api';
 import { useRun, useRunEvents, useRuns } from '../../lib/queries';
 import type { Run, RunEvent } from '../../lib/types';
@@ -59,6 +59,7 @@ export function RunsPage() {
                   <Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge>
                 </div>
                 <div className="truncate text-xs text-zinc-500">
+                  {r.session_url && <Cloud className="mr-1 inline size-3" />}
                   {r.trigger} · <RelTime iso={r.queued_at} />
                   {r.error_kind ? ` · ${r.error_kind}` : ''}
                 </div>
@@ -107,10 +108,15 @@ function RunDetail({ id }: { id: string }) {
                 </button>
               </>
             )}
-            {r.provider_session_id && ` · session ${r.provider_session_id.slice(0, 8)}${r.resume_session_id ? ' (resumed)' : ''}`}
+            {r.provider_session_id && ` · session ${r.provider_session_id.replace(/^(session_|cse_)/, '').slice(0, 10)}${r.resume_session_id ? ' (resumed)' : ''}`}
           </div>
         </div>
-        {(r.status === 'running' || r.status === 'queued') && (
+        {r.session_url && (
+          <a className="btn btn-sm" href={r.session_url} target="_blank" rel="noreferrer" title="Watch or steer this Claude Code on the web session">
+            <Cloud className="size-3.5" /> Open cloud session <ExternalLink className="size-3" />
+          </a>
+        )}
+        {(r.status === 'running' || r.status === 'queued') && !r.session_url && (
           <button className="btn btn-sm" onClick={() => cancel.mutate()}>
             <Square className="size-3.5" /> Cancel
           </button>
@@ -242,7 +248,7 @@ function EventLine({ e }: { e: RunEvent }) {
     case 'init':
       return (
         <div className="flex items-start gap-2 text-xs text-zinc-500">
-          <Info className="mt-0.5 size-3.5 shrink-0" /> Session {String(d.sessionId ?? '').slice(0, 8)} · model {String(d.model ?? '?')} · key source <b className={d.apiKeySource === 'none' ? 'text-emerald-600' : 'text-red-600'}>{String(d.apiKeySource ?? 'none')}</b> · AgentOS tools {String(d.mcp)}
+          <Info className="mt-0.5 size-3.5 shrink-0" /> Session {String(d.sessionId ?? '').replace(/^(session_|cse_)/, '').slice(0, 10)} · model {String(d.model ?? '?')} · key source <b className={d.apiKeySource === 'none' ? 'text-emerald-600' : 'text-red-600'}>{String(d.apiKeySource ?? 'none')}</b> · AgentOS tools {String(d.mcp)}
         </div>
       );
     case 'rate_limit':

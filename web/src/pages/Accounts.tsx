@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { KeyRound, Plus, Server, ShieldCheck, Trash2, RotateCcw, Terminal } from 'lucide-react';
+import { KeyRound, Plus, Server, ShieldCheck, Trash2, RotateCcw, Terminal, Cloud, Settings2 } from 'lucide-react';
 import { api, useAction } from '../lib/api';
 import { useAccounts, useMeta, useRunners } from '../lib/queries';
 import type { Account, Runner } from '../lib/types';
 import { ACCOUNT_STATUS } from '../lib/format';
 import { Badge, CopyButton, Empty, Field, Loading, Modal, RelTime, SectionTitle } from '../components/ui';
+import { CloudSetupModal, RoutineTriggerModal } from '../components/CloudSetup';
 
 function resolveDir(acc: Account, runner?: Runner) {
   if (!acc.config_dir) return null;
@@ -44,6 +45,8 @@ export function AccountsPage() {
   const [adding, setAdding] = useState(false);
   const [addingRunner, setAddingRunner] = useState(false);
   const [loginFor, setLoginFor] = useState<Account | null>(null);
+  const [cloudGuide, setCloudGuide] = useState<{ account: Account; token?: string | null } | null>(null);
+  const [triggerFor, setTriggerFor] = useState<Account | null>(null);
   const reset = useAction((id: string) => api('POST', `/api/accounts/${id}/reset-status`), { success: 'Status reset; the runner will re-check it' });
   const remove = useAction((id: string) => api('DELETE', `/api/accounts/${id}`), { success: 'Account removed' });
   const removeRunner = useAction((id: string) => api('DELETE', `/api/runners/${id}`), { success: 'Runner removed' });
@@ -93,10 +96,21 @@ export function AccountsPage() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="truncate font-medium">{acc.name}</span>
-                      <Badge tone={acc.provider === 'mock' ? 'zinc' : 'indigo'}>{acc.provider === 'claude-code' ? 'Claude Code · subscription' : 'Mock (testing)'}</Badge>
+                      <Badge tone={acc.provider === 'mock' ? 'zinc' : acc.provider === 'claude-cloud' ? 'violet' : 'indigo'}>
+                        {acc.provider === 'claude-code' ? 'Claude Code · runner' : acc.provider === 'claude-cloud' ? 'Claude Code on the web' : 'Mock (testing)'}
+                      </Badge>
                     </div>
-                    <div className="mt-0.5 text-xs text-zinc-500">
-                      Runner: {runner ? `${runner.name} (${runner.status})` : 'none'} · max {acc.max_concurrent_runs} concurrent run(s)
+                    <div className="mt-0.5 truncate text-xs text-zinc-500">
+                      {acc.provider === 'claude-cloud' ? (
+                        <>
+                          <Cloud className="mr-1 inline size-3" />
+                          Cloud sessions via routine {acc.fire_url?.match(/trig_[A-Za-z0-9]+/)?.[0] ?? '(not set)'} · max {acc.max_concurrent_runs} concurrent
+                        </>
+                      ) : (
+                        <>
+                          Runner: {runner ? `${runner.name} (${runner.status})` : 'none'} · max {acc.max_concurrent_runs} concurrent run(s)
+                        </>
+                      )}
                     </div>
                   </div>
                   <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ${st.cls}`}>{st.label}</span>
@@ -119,6 +133,16 @@ export function AccountsPage() {
                     <button className="btn btn-sm" onClick={() => setLoginFor(acc)}>
                       <Terminal className="size-3.5" /> Sign-in instructions
                     </button>
+                  )}
+                  {acc.provider === 'claude-cloud' && (
+                    <>
+                      <button className="btn btn-sm" onClick={() => setCloudGuide({ account: acc })}>
+                        <Cloud className="size-3.5" /> Setup guide
+                      </button>
+                      <button className="btn btn-sm" onClick={() => setTriggerFor(acc)}>
+                        <Settings2 className="size-3.5" /> Routine trigger
+                      </button>
+                    </>
                   )}
                   <button className="btn btn-sm" onClick={() => reset.mutate(acc.id)}>
                     <RotateCcw className="size-3.5" /> Re-check
@@ -189,27 +213,42 @@ export function AccountsPage() {
         </table>
       </div>
 
-      <AddAccountModal open={adding} onClose={() => setAdding(false)} runners={runners.data!} />
+      <AddAccountModal open={adding} onClose={() => setAdding(false)} runners={runners.data!} onCloudCreated={(account, token) => setCloudGuide({ account, token })} />
+      {cloudGuide && <CloudSetupModal account={cloudGuide.account} token={cloudGuide.token} onClose={() => setCloudGuide(null)} />}
+      {triggerFor && <RoutineTriggerModal account={triggerFor} onClose={() => setTriggerFor(null)} />}
       <AddRunnerModal open={addingRunner} onClose={() => setAddingRunner(false)} />
       {loginFor && <LoginModal acc={loginFor} runner={runnerById(loginFor.runner_id)} onClose={() => setLoginFor(null)} />}
     </div>
   );
 }
 
-function AddAccountModal({ open, onClose, runners }: { open: boolean; onClose: () => void; runners: Runner[] }) {
-  const [form, setForm] = useState({ name: '', provider: 'claude-code', runner_id: '', config_dir: '', max_concurrent_runs: 1 });
-  const create = useAction(() => api('POST', '/api/accounts', { ...form, runner_id: form.runner_id || null, config_dir: form.config_dir || null }), {
-    success: 'Account added. The runner will check its sign-in shortly',
-    onSuccess: () => {
-      setForm({ name: '', provider: 'claude-code', runner_id: '', config_dir: '', max_concurrent_runs: 1 });
-      onClose();
+function AddAccountModal({ open, onClose, runners, onCloudCreated }: { open: boolean; onClose: () => void; runners: Runner[]; onCloudCreated: (a: Account, token: string) => void }) {
+  const blank = { name: '', provider: 'claude-cloud', runner_id: '', config_dir: '', max_concurrent_runs: 2, fire_url: '', fire_token: '' };
+  const [form, setForm] = useState(blank);
+  const cloud = form.provider === 'claude-cloud';
+  const create = useAction(
+    () =>
+      api('POST', '/api/accounts', {
+        name: form.name,
+        provider: form.provider,
+        max_concurrent_runs: form.max_concurrent_runs,
+        ...(cloud ? { fire_url: form.fire_url, fire_token: form.fire_token } : { runner_id: form.runner_id || null, config_dir: form.config_dir || null }),
+      }),
+    {
+      success: cloud ? 'Cloud account added. Finish the setup on claude.ai' : 'Account added. The runner will check its sign-in shortly',
+      onSuccess: (r: any) => {
+        setForm(blank);
+        onClose();
+        if (r.cloud_token) onCloudCreated(r, r.cloud_token);
+      },
     },
-  });
+  );
   return (
     <Modal
       open={open}
       onClose={onClose}
       title="Add account"
+      width="max-w-xl"
       footer={
         <>
           <button className="btn" onClick={onClose}>
@@ -222,31 +261,48 @@ function AddAccountModal({ open, onClose, runners }: { open: boolean; onClose: (
       }
     >
       <div className="space-y-3">
-        <Field label="Name" hint="e.g. “Max account A (personal)”">
+        <Field label="Name" hint="e.g. “Max account A”">
           <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} autoFocus />
         </Field>
-        <Field label="Provider">
-          <select className="input" value={form.provider} onChange={(e) => setForm({ ...form, provider: e.target.value })}>
-            <option value="claude-code">Claude Code (Pro/Max subscription)</option>
+        <Field label="How its agents run">
+          <select className="input" value={form.provider} onChange={(e) => setForm({ ...form, provider: e.target.value, max_concurrent_runs: e.target.value === 'claude-cloud' ? 2 : 1 })}>
+            <option value="claude-cloud">Claude Code on the web: cloud sessions on your GitHub repo</option>
+            <option value="claude-code">Claude Code CLI on a runner (VPS or your machine)</option>
             <option value="mock">Mock agent (testing, no usage)</option>
           </select>
         </Field>
-        <Field label="Runner" hint="The machine where this account signs in and its agents run.">
-          <select className="input" value={form.runner_id} onChange={(e) => setForm({ ...form, runner_id: e.target.value })}>
-            <option value="">Default ({runners[0]?.name ?? 'none'})</option>
-            {runners.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name} ({r.status})
-              </option>
-            ))}
-          </select>
-        </Field>
-        {form.provider === 'claude-code' && (
-          <Field label="Config directory (optional)" hint="CLAUDE_CONFIG_DIR on the runner. Leave empty for a dedicated directory inside the runner's data dir. Use an existing directory to reuse a sign-in.">
-            <input className="input font-mono text-xs" placeholder="~runner/accounts/<id>/claude" value={form.config_dir} onChange={(e) => setForm({ ...form, config_dir: e.target.value })} />
-          </Field>
+        {cloud ? (
+          <>
+            <div className="rounded-lg bg-zinc-50 p-3 text-xs text-zinc-600 dark:bg-zinc-800/50 dark:text-zinc-400">
+              Leave the routine fields empty on first setup. Creating the account gives you the AgentOS token that the routine's cloud environment needs. The setup guide opens next. Once the routine exists, add its Fire URL and token with “Routine trigger”.
+            </div>
+            <Field label="Routine Fire URL (optional now)">
+              <input className="input font-mono text-xs" value={form.fire_url} onChange={(e) => setForm({ ...form, fire_url: e.target.value })} placeholder="https://api.anthropic.com/v1/claude_code/routines/trig_…/fire" />
+            </Field>
+            <Field label="Routine trigger token" hint="Scoped to firing this one routine. Stored encrypted.">
+              <input type="password" className="input font-mono text-xs" value={form.fire_token} onChange={(e) => setForm({ ...form, fire_token: e.target.value })} placeholder="sk-ant-oat01-…" autoComplete="off" />
+            </Field>
+          </>
+        ) : (
+          <>
+            <Field label="Runner" hint="The machine where this account signs in and its agents run.">
+              <select className="input" value={form.runner_id} onChange={(e) => setForm({ ...form, runner_id: e.target.value })}>
+                <option value="">Default ({runners[0]?.name ?? 'none'})</option>
+                {runners.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name} ({r.status})
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {form.provider === 'claude-code' && (
+              <Field label="Config directory (optional)" hint="CLAUDE_CONFIG_DIR on the runner. Leave empty for a dedicated directory inside the runner's data dir.">
+                <input className="input font-mono text-xs" placeholder="~runner/accounts/<id>/claude" value={form.config_dir} onChange={(e) => setForm({ ...form, config_dir: e.target.value })} />
+              </Field>
+            )}
+          </>
         )}
-        <Field label="Max concurrent runs" hint="1 keeps usage predictable on a subscription.">
+        <Field label="Max concurrent runs" hint={cloud ? 'How many cloud sessions of this account may work at once.' : '1 keeps usage predictable on a subscription.'}>
           <input type="number" min={1} max={8} className="input w-24" value={form.max_concurrent_runs} onChange={(e) => setForm({ ...form, max_concurrent_runs: Number(e.target.value) })} />
         </Field>
       </div>

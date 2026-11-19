@@ -11,7 +11,8 @@ export type CoordinationMode = 'pm_led' | 'collaborative';
 export type MergePolicy = 'auto' | 'owner_approval';
 
 export type AccountStatus = 'unknown' | 'ready' | 'auth_required' | 'rate_limited' | 'billing_blocked' | 'error';
-export type Provider = 'claude-code' | 'mock';
+export type Provider = 'claude-code' | 'claude-cloud' | 'mock';
+export type WorkspaceMode = 'runner' | 'github';
 
 export type RunStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 export type RunErrorKind =
@@ -61,6 +62,8 @@ export interface Project {
   autonomy: Autonomy;
   merge_policy: MergePolicy;
   push_on_merge: boolean;
+  workspace_mode: WorkspaceMode;
+  has_github_token: boolean;
   limits: ProjectLimits;
   task_seq: number;
   archived: boolean;
@@ -100,6 +103,10 @@ export interface Account {
   status_detail: string | null;
   rate_limited_until: string | null;
   max_concurrent_runs: number;
+  /** claude-cloud: routine API trigger URL (the trigger token itself is never returned). */
+  fire_url: string | null;
+  has_fire_token: boolean;
+  has_cloud_token: boolean;
   usage: UsageSnapshot;
   auth: AuthSnapshot;
   created_at: string;
@@ -237,6 +244,9 @@ export interface Run {
   git: GitReport;
   cancel_requested: boolean;
   owner_reply_conversation_id: string | null;
+  /** Cloud runs: link to the Claude Code on the web session. */
+  session_url: string | null;
+  last_activity_at: string | null;
   queued_at: string;
   started_at: string | null;
   finished_at: string | null;
@@ -336,7 +346,6 @@ export interface ActivityEntry {
   data: Record<string, unknown>;
   created_at: string;
 }
-
 
 // ---- UI-side composite shapes returned by the API ----
 export interface ProjectStats {
