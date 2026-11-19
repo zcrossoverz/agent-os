@@ -1,6 +1,7 @@
 import type { Core } from '../core/core.js';
 import { toProject } from '../core/mappers.js';
-import { DEFAULT_LIMITS, type Autonomy, type CoordinationMode, type MergePolicy, type Project, type ProjectLimits } from '../core/types.js';
+import { DEFAULT_LIMITS, type Autonomy, type CoordinationMode, type MergePolicy, type Project, type ProjectLimits, type WorkspaceMode } from '../core/types.js';
+import { parseGitHubRepo } from './github.js';
 import { badRequest, conflict, newId, notFound, nowIso, slugify } from '../util/util.js';
 
 export interface CreateProjectInput {
@@ -15,6 +16,10 @@ export interface CreateProjectInput {
   merge_policy?: MergePolicy;
   push_on_merge?: boolean;
   limits?: Partial<ProjectLimits>;
+  /** runner: repository lives on a runner (local git). github: the GitHub repo is the shared workspace (cloud agents). */
+  workspace_mode?: WorkspaceMode;
+  /** Write-only. Fine-grained token with Contents read/write on the repo; stored encrypted. Empty string clears it. */
+  github_token?: string | null;
 }
 
 export class ProjectService {
@@ -49,6 +54,9 @@ export class ProjectService {
     if (!/^[A-Z][A-Z0-9]{1,9}$/.test(key)) throw badRequest('Project key must be 2-10 letters/digits, starting with a letter');
     if (this.db.get('SELECT 1 FROM projects WHERE key = ?', key)) throw conflict(`Project key ${key} is already used`);
     const runnerId = input.runner_id ?? this.core.runners.defaultRunnerId();
+    const workspaceMode = input.workspace_mode ?? 'runner';
+    if (!['runner', 'github'].includes(workspaceMode)) throw badRequest('Invalid workspace mode');
+    if (workspaceMode === 'github' && !parseGitHubRepo(input.repo_url)) throw badRequest('A GitHub workspace needs the repository URL, e.g. https://github.com/owner/repo');
     const now = nowIso();
     const id = newId('prj');
     this.db.tx(() => {
@@ -66,6 +74,8 @@ export class ProjectService {
         merge_policy: input.merge_policy ?? 'auto',
         push_on_merge: input.push_on_merge ?? false,
         limits: JSON.stringify({ ...DEFAULT_LIMITS, ...(input.limits ?? {}) }),
+        workspace_mode: workspaceMode,
+        github_token_enc: input.github_token?.trim() ? this.core.secrets.encrypt(input.github_token.trim()) : null,
         created_at: now,
         updated_at: now,
       });
@@ -90,6 +100,14 @@ export class ProjectService {
       if (patch[k] !== undefined) row[k] = patch[k];
     }
     if (patch.push_on_merge !== undefined) row.push_on_merge = patch.push_on_merge;
+    if (patch.workspace_mode !== undefined) {
+      if (!['runner', 'github'].includes(patch.workspace_mode)) throw badRequest('Invalid workspace mode');
+      row.workspace_mode = patch.workspace_mode;
+    }
+    if (patch.github_token !== undefined) row.github_token_enc = patch.github_token?.trim() ? this.core.secrets.encrypt(patch.github_token.trim()) : null;
+    const nextMode = row.workspace_mode ?? p.workspace_mode;
+    const nextRepo = row.repo_url !== undefined ? row.repo_url : p.repo_url;
+    if (nextMode === 'github' && !parseGitHubRepo(nextRepo)) throw badRequest('A GitHub workspace needs the repository URL, e.g. https://github.com/owner/repo');
     if (patch.archived !== undefined) row.archived = patch.archived;
     if (patch.limits) row.limits = JSON.stringify({ ...p.limits, ...patch.limits });
     if (patch.pm_agent_id !== undefined) {
@@ -109,7 +127,7 @@ export class ProjectService {
         this.db.run('UPDATE agents SET is_pm = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE project_id = ?', patch.pm_agent_id, p.id);
       }
     });
-    const changed = Object.keys(row).filter((k) => k !== 'updated_at');
+    const changed = Object.keys(row).filter((k) => k !== 'updated_at').map((k) => (k === 'github_token_enc' ? 'github_token' : k));
     if (row.autonomy && row.autonomy !== p.autonomy) {
       this.core.activity(p.id, actor, 'project.autonomy', `Autonomy changed from ${p.autonomy} to ${row.autonomy}`, { type: 'project', id: p.id });
     } else if (changed.length) {

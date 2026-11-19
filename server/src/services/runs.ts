@@ -111,6 +111,15 @@ export class RunService {
     const project = this.core.projects.get(task.project_id);
     const existing = this.db.get("SELECT * FROM runs WHERE kind = 'merge' AND focus_task_id = ? AND status IN ('queued','running')", task.id);
     if (existing) return toRun(existing);
+    if (project.workspace_mode === 'github') {
+      // Executed by the control plane itself through the GitHub API (orchestrator/cloud.ts).
+      const id = newId('run');
+      this.db.insert('runs', { id, project_id: project.id, kind: 'merge', runner_id: null, status: 'queued', trigger: 'merge', focus_task_id: task.id, prompt: `Merge ${task.branch} into ${project.base_branch} (GitHub)`, queued_at: nowIso() });
+      this.core.activity(project.id, 'system', 'run.merge_queued', `Merge of ${task.key} queued (GitHub)`, { type: 'run', id });
+      this.core.bus.change({ topic: 'runs', projectId: project.id, id });
+      this.core.bus.kick();
+      return this.get(id);
+    }
     if (!project.runner_id) {
       this.core.tasks.onMergeResult(task.id, 'failed', 'Project has no runner to perform the merge');
       return undefined;
@@ -344,7 +353,7 @@ export class RunService {
     );
   }
 
-  private recordCommits(run: Run, commits: NonNullable<RunCompletion['git']>['commits'] & {}, agentId: string | null) {
+  recordCommits(run: Run, commits: NonNullable<RunCompletion['git']>['commits'] & {}, agentId: string | null) {
     const project = this.core.projects.get(run.project_id);
     const keyRe = new RegExp(`\\b${project.key}-(\\d+)\\b`, 'i');
     for (const cm of commits) {
@@ -393,10 +402,49 @@ export class RunService {
     }
   }
 
-  /** Safety net for runs whose runner never reported back. */
+  // ---------------------------------------------------------------- cloud runs
+
+  /** The running cloud run of this account whose Claude Code on the web session sent the request. */
+  findCloudRun(accountId: string, sessionHeader: string | undefined): Run | undefined {
+    const sid = normalizeSessionId(sessionHeader);
+    if (!sid) return undefined;
+    for (const r of this.db.all("SELECT * FROM runs WHERE account_id = ? AND status = 'running' AND runner_id IS NULL AND kind = 'agent' AND provider_session_id IS NOT NULL", accountId)) {
+      if (normalizeSessionId(r.provider_session_id) === sid) return toRun(r);
+    }
+    return undefined;
+  }
+
+  /** Bind a cloud session to a dispatched run (start_run). */
+  bindCloudSession(accountId: string, runId: string, sessionHeader: string | undefined): Run {
+    const run = this.db.get('SELECT * FROM runs WHERE id = ?', runId.trim());
+    if (!run || run.account_id !== accountId) throw badRequest(`Unknown run code "${runId}" for this account`);
+    if (run.status !== 'running') throw badRequest(`Run ${runId} is ${run.status}; it is no longer active. Stop working and end the session.`);
+    const sid = normalizeSessionId(sessionHeader);
+    if (!sid) throw badRequest('AgentOS could not identify this cloud session: the X-AgentOS-Session header is missing. The repository .mcp.json must send X-AgentOS-Session: ${CLAUDE_CODE_REMOTE_SESSION_ID}.');
+    const bound = normalizeSessionId(run.provider_session_id);
+    if (bound && bound !== sid) throw badRequest(`Run ${runId} belongs to another cloud session`);
+    if (!bound) this.db.update('runs', runId, { provider_session_id: sessionHeader!.trim() });
+    this.touch(runId);
+    return this.get(runId);
+  }
+
+  touch(runId: string) {
+    this.db.update('runs', runId, { last_activity_at: nowIso() });
+  }
+
+  /** Server-side run log entries (cloud runs have no runner streaming events). */
+  recordEvent(runId: string, type: RunnerEvent['type'], data: Record<string, unknown>) {
+    const run = this.db.get<{ project_id: string }>('SELECT project_id FROM runs WHERE id = ?', runId);
+    if (!run) return;
+    const seq = (this.db.get<{ n: number }>('SELECT COALESCE(MAX(seq), 0) + 1 AS n FROM run_events WHERE run_id = ?', runId)!.n);
+    this.db.run('INSERT INTO run_events (run_id, seq, ts, type, data) VALUES (?, ?, ?, ?, ?)', runId, seq, nowIso(), type, JSON.stringify(data));
+    this.core.bus.change({ topic: 'run_events', projectId: run.project_id, id: runId });
+  }
+
+  /** Safety net for runs whose runner never reported back. Cloud runs are watched by the cloud worker. */
   sweepTimeouts() {
     const cutoff = new Date(Date.now() - (this.core.config.runTimeoutSec + 300) * 1000).toISOString();
-    for (const r of this.db.all("SELECT id FROM runs WHERE status = 'running' AND started_at < ?", cutoff)) {
+    for (const r of this.db.all("SELECT id FROM runs WHERE status = 'running' AND runner_id IS NOT NULL AND started_at < ?", cutoff)) {
       this.complete(r.id, { status: 'failed', errorKind: 'timeout', errorDetail: 'Run exceeded the maximum duration' });
     }
   }
@@ -404,4 +452,11 @@ export class RunService {
   commits(projectId: string, limit = 200) {
     return this.db.all('SELECT * FROM commits WHERE project_id = ? ORDER BY COALESCE(committed_at, created_at) DESC LIMIT ?', projectId, limit);
   }
+}
+
+/** Cloud session ids appear as "session_…" (API) and "cse_…" (inside the session); compare the rest. */
+export function normalizeSessionId(id: string | null | undefined): string | null {
+  const v = id?.trim();
+  if (!v) return null;
+  return v.replace(/^(session_|cse_)/, '');
 }

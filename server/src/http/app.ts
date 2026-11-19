@@ -5,12 +5,13 @@ import path from 'node:path';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z, ZodError } from 'zod';
 import type { Change, Core } from '../core/core.js';
-import { TASK_STATUSES, type RunCompletion, type RunnerEvent, type RunnerHeartbeat } from '../core/types.js';
-import { buildMcpServer } from '../mcp/tools.js';
+import { TASK_STATUSES, type Run, type RunCompletion, type RunnerEvent, type RunnerHeartbeat } from '../core/types.js';
+import { buildMcpServer, type McpAccess, type McpContext } from '../mcp/tools.js';
 import { OwnerAuth, SESSION_COOKIE, SESSION_MAX_AGE, parseCookies } from './auth.js';
-import { HttpError, badRequest, forbidden, log, sleep } from '../util/util.js';
+import { HttpError, badRequest, forbidden, log, sleep, truncate } from '../util/util.js';
 import { ROLE_PRESETS } from '../services/agents.js';
 import { APPROVAL_KINDS } from '../services/approvals.js';
+import { ROUTINE_PROMPT, cloudRepoFiles, isPubliclyReachable, publicHost } from '../orchestrator/cloud.js';
 
 export const VERSION = '0.1.0';
 
@@ -156,10 +157,12 @@ export async function buildApp(core: Core, auth: OwnerAuth): Promise<FastifyInst
   app.get('/api/accounts', async () => core.accounts.list());
   const accountSchema = z.object({
     name: z.string().min(1).max(80),
-    provider: z.enum(['claude-code', 'mock']),
+    provider: z.enum(['claude-code', 'claude-cloud', 'mock']),
     runner_id: z.string().nullable().optional(),
     config_dir: z.string().max(500).nullable().optional(),
     max_concurrent_runs: z.number().int().min(1).max(8).optional(),
+    fire_url: z.string().max(500).nullable().optional(),
+    fire_token: z.string().max(500).nullable().optional(),
   });
   app.post('/api/accounts', async (req) => core.accounts.create(parse(accountSchema, req.body)));
   app.patch('/api/accounts/:id', async (req) => core.accounts.update((req.params as any).id, parse(accountSchema.partial().omit({ provider: true }), req.body) as any));
@@ -167,6 +170,17 @@ export async function buildApp(core: Core, auth: OwnerAuth): Promise<FastifyInst
     core.accounts.remove((req.params as any).id);
     return { ok: true };
   });
+  app.post('/api/accounts/:id/rotate-cloud-token', async (req) => ({ token: core.accounts.rotateCloudToken((req.params as any).id) }));
+
+  // Everything the owner needs to connect Claude Code on the web to AgentOS (no secrets).
+  app.get('/api/cloud/setup', async () => ({
+    publicUrl: core.config.publicUrl,
+    host: publicHost(core.config.publicUrl),
+    reachable: isPubliclyReachable(core.config.publicUrl),
+    routinePrompt: ROUTINE_PROMPT,
+    files: cloudRepoFiles(core.config.publicUrl),
+  }));
+
   app.post('/api/accounts/:id/reset-status', async (req) => {
     const acc = core.accounts.get((req.params as any).id);
     core.accounts.setStatus(acc.id, acc.provider === 'mock' ? 'ready' : 'unknown', 'Reset by owner');
@@ -186,6 +200,8 @@ export async function buildApp(core: Core, auth: OwnerAuth): Promise<FastifyInst
     autonomy: z.enum(['paused', 'supervised', 'autonomous']).optional(),
     merge_policy: z.enum(['auto', 'owner_approval']).optional(),
     push_on_merge: z.boolean().optional(),
+    workspace_mode: z.enum(['runner', 'github']).optional(),
+    github_token: z.string().max(500).nullable().optional(),
     limits: z
       .object({
         maxAgentStreak: z.number().int().min(2).max(100),
@@ -207,6 +223,14 @@ export async function buildApp(core: Core, auth: OwnerAuth): Promise<FastifyInst
   app.patch('/api/projects/:id', async (req) => {
     const body = parse(projectSchema.partial().extend({ pm_agent_id: z.string().nullable().optional(), archived: z.boolean().optional() }), req.body);
     return core.projects.update((req.params as any).id, body);
+  });
+
+  app.post('/api/projects/:id/github/check', async (req) => core.github.checkAccess(core.projects.get((req.params as any).id)));
+  app.post('/api/projects/:id/github/setup', async (req) => {
+    const p = core.projects.get((req.params as any).id);
+    const results = await core.github.ensureFiles(p, cloudRepoFiles(core.config.publicUrl), 'Connect cloud agents to AgentOS (MCP config)');
+    core.activity(p.id, 'owner', 'project.github_setup', `AgentOS repository setup: ${results.map((r) => `${r.path} ${r.status}`).join(', ')}`, { type: 'project', id: p.id });
+    return { results, files: cloudRepoFiles(core.config.publicUrl) };
   });
 
   // ---------------------------------------------------------------- agents
@@ -456,11 +480,36 @@ export async function buildApp(core: Core, auth: OwnerAuth): Promise<FastifyInst
   // ---------------------------------------------------------------- MCP endpoint for agents
 
   const mcpHandler = async (req: FastifyRequest, reply: FastifyReply) => {
-    const run = core.runs.verifyToken(bearer(req));
-    if (!run || run.kind !== 'agent' || !run.agent_id) return reply.status(401).send({ error: 'Invalid or expired run token' });
-    const agent = core.agents.get(run.agent_id);
-    const project = core.projects.get(run.project_id);
-    const server = buildMcpServer({ core, run, agent, project });
+    const token = bearer(req);
+    const ctxFor = (r: Run): McpContext => ({ core, run: r, agent: core.agents.get(r.agent_id!), project: core.projects.get(r.project_id) });
+    let access: McpAccess;
+    const runnerRun = core.runs.verifyToken(token);
+    if (runnerRun) {
+      if (runnerRun.kind !== 'agent' || !runnerRun.agent_id) return reply.status(401).send({ error: 'Invalid run token' });
+      const fixed = ctxFor(runnerRun);
+      access = { mode: 'runner', resolve: () => fixed };
+    } else {
+      // Claude Code on the web: the account's AgentOS token arrives through the cloud environment's
+      // network secret; the session identifies itself with X-AgentOS-Session.
+      const account = core.accounts.byCloudToken(token);
+      if (!account) return reply.status(401).send({ error: 'Invalid or expired AgentOS token' });
+      const session = typeof req.headers['x-agentos-session'] === 'string' ? (req.headers['x-agentos-session'] as string) : undefined;
+      access = {
+        mode: 'cloud',
+        resolve: () => {
+          const r = core.runs.findCloudRun(account.id, session);
+          if (!r) throw new HttpError(400, 'No active AgentOS run for this session. Call start_run with the run code from your routine payload first. If you have none, or start_run fails, stop: there is nothing to do.');
+          return ctxFor(r);
+        },
+        bind: (code) => ctxFor(core.runs.bindCloudSession(account.id, code, session)),
+        onCall: (c, tool, args, ok, text) => {
+          core.runs.touch(c.run.id);
+          core.runs.recordEvent(c.run.id, 'tool_use', { name: `mcp__agentos__${tool}`, input: truncate(JSON.stringify(args ?? {}), 4000) });
+          core.runs.recordEvent(c.run.id, 'tool_result', { name: tool, isError: !ok, content: truncate(text, 4000) });
+        },
+      };
+    }
+    const server = buildMcpServer(core, access);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     reply.hijack();
     reply.raw.on('close', () => {

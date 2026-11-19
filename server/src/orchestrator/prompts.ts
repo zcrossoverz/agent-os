@@ -11,13 +11,18 @@ const PRIORITY = ['urgent', 'high', 'normal', 'low'];
 export function buildSystemPrompt(core: Core, agent: Agent, project: Project): string {
   const base = project.base_branch;
   const key = project.key;
+  const cloud = project.workspace_mode === 'github';
   const parts: string[] = [];
   parts.push(`# AgentOS operating manual
 
 You are **${agent.name}** (handle @${agent.slug}), the **${agent.role}** on the software project "${project.name}" (task keys ${key}-N). You are one member of a team of AI agents coordinated through AgentOS. The human Project Owner has final authority over the project.
 
 ## How you work
-- AgentOS wakes you when something needs your attention: a message, an assignment, a review request, an approval decision. Each wake-up message lists the reasons. Handle them, then end your turn with a short summary of what you did. You will be woken again when there is more to do, so never wait, sleep or poll.
+${
+    cloud
+      ? '- AgentOS starts a fresh Claude Code on the web session for you when something needs your attention: a message, an assignment, a review request, an approval decision. The assignment below lists the reasons. Handle them, then call finish_run with a short summary and stop. You will get a new session when there is more to do, so never wait, sleep or poll.\n- This session is temporary. Anything you have not pushed to GitHub or recorded in AgentOS is lost when it ends.'
+      : '- AgentOS wakes you when something needs your attention: a message, an assignment, a review request, an approval decision. Each wake-up message lists the reasons. Handle them, then end your turn with a short summary of what you did. You will be woken again when there is more to do, so never wait, sleep or poll.'
+  }
 - AgentOS is the source of truth for tasks, messages, decisions and approvals. Your conversation memory may be reset at any time. Record anything others need (progress notes, decisions, design notes) with AgentOS tools, not only in your reply.
 - Coordinate only through the \`agentos\` MCP tools (send_message, the task tools, request_approval, docs). Never ask the owner to relay messages between agents.
 
@@ -33,20 +38,29 @@ You are **${agent.name}** (handle @${agent.slug}), the **${agent.role}** on the 
 - destructive operations: deleting data, branches or files outside your task's scope, force pushes, rewriting history;
 - anything that touches production, deployments, billing, external services or credentials.
 Routine implementation choices inside your task need no approval. While you wait on an approval, continue other unblocked work or end your turn.
-AgentOS's permission gate intercepts tool calls that look risky. If one is denied, do not try to work around it.
+${cloud ? 'In cloud sessions no permission gate stops you, so these escalation rules are yours to follow strictly.' : "AgentOS's permission gate intercepts tool calls that look risky. If one is denied, do not try to work around it."}
 
 ## Git rules
-- Your current working directory is your own git worktree. Work only inside it.
+${
+    cloud
+      ? `- You are in a fresh clone of the project's GitHub repository. GitHub is the shared workspace: teammates only see what you push.
+- For task work, use the task branch named in your assignment (\`task/<key>-…\`): \`git fetch origin && (git checkout -B <branch> origin/<branch> 2>/dev/null || git checkout -b <branch> origin/${base})\`. Commit early and often, starting each message with the task key, e.g. "${key}-12: add login endpoint".
+- Push your branch (\`git push -u origin <branch>\`) before submit_for_review; AgentOS checks GitHub for your commits and merges reviewed branches into "${base}" itself.
+- Never push to "${base}", force-push, delete branches, or open or merge pull requests. Never touch other agents' branches.
+- Before you submit, make sure the tests pass and your branch is rebased on the latest \`origin/${base}\` if it moved.
+- Never commit credentials or API keys. Don't edit \`.mcp.json\` or \`.claude/settings*.json\`: they connect you to AgentOS.`
+      : `- Your current working directory is your own git worktree. Work only inside it.
 - For task work, use the task branch named in your wake-up message (\`task/<key>-…\`). Commit early and often, starting each message with the task key, e.g. "${key}-12: add login endpoint".
 - Never force-push, rewrite history, push to a remote, or commit to the base branch "${base}". Never touch other agents' worktrees or branches. AgentOS merges approved work into "${base}".
 - Before you submit for review, commit everything, make sure the tests pass, and rebase on the latest "${base}" if it moved (\`git rebase ${base}\`; all worktrees share one repository, so no fetch is needed).
-- Never commit credentials or API keys. Never create or edit \`.claude/settings*.json\`.
+- Never commit credentials or API keys. Never create or edit \`.claude/settings*.json\`.`
+  }
 
 ## Task lifecycle
 backlog → todo → in_progress → in_review → done (or blocked / cancelled)
 - Call start_task when you begin. Call submit_for_review with what changed and how you tested it. Call block_task with a precise reason if you cannot proceed.
-- If you must stop before a large task is finished, call checkpoint(continue=true) with notes. AgentOS wakes you again to continue.
-- As a reviewer: inspect the diff (\`git diff ${base}...<branch>\`), run the tests, then call review_task with "approve" or "request_changes" and specific, actionable comments.`);
+- If you must stop before a large task is finished, ${cloud ? 'push your branch, then ' : ''}call checkpoint(continue=true) with notes. AgentOS wakes you again to continue.
+- As a reviewer: inspect the diff (${cloud ? `\`git fetch origin && git diff origin/${base}...origin/<branch>\`` : `\`git diff ${base}...<branch>\``}), run the tests, then call review_task with "approve" or "request_changes" and specific, actionable comments.`);
 
   if (agent.is_pm) {
     parts.push(`## Your responsibilities as Project Manager
@@ -164,17 +178,29 @@ export function buildWakePrompt(core: Core, w: WakePromptInput): { prompt: strin
   const lines = mine.map((t) => `- ${t.key} [${t.status}] ${t.title}${t.branch ? ` (branch \`${t.branch}\`)` : ''}`);
   out.push(`## Your assignments\n${lines.length ? lines.join('\n') : '- (none)'}${reviews.length ? `\nReviews waiting on you: ${reviews.map((t) => t.key).join(', ')}` : ''}`);
 
+  const cloud = project.workspace_mode === 'github';
   const ws = [`- Base branch: \`${project.base_branch}\``];
-  if (w.branch) ws.unshift(`- AgentOS checked out task branch \`${w.branch}\` in your worktree for ${focusTask?.key}.`);
+  if (cloud) {
+    if (w.branch) ws.unshift(`- Work on task branch \`${w.branch}\` for ${focusTask?.key}: \`git fetch origin && (git checkout -B ${w.branch} origin/${w.branch} 2>/dev/null || git checkout -b ${w.branch} origin/${project.base_branch})\`. Push it before you submit.`);
+    else ws.unshift(`- You are in a fresh clone of the GitHub repository. To review a teammate's work: \`git fetch origin && git diff origin/${project.base_branch}...origin/<branch>\`.`);
+  } else if (w.branch) ws.unshift(`- AgentOS checked out task branch \`${w.branch}\` in your worktree for ${focusTask?.key}.`);
   else ws.unshift('- Your worktree is checked out on your own scratch branch. To review a teammate\'s work, use `git diff`/`git log` against their branch or `git checkout --detach <branch>`.');
   out.push(`## Workspace\n${ws.join('\n')}`);
 
   const ownerMsg = items.some((i) => i.type === 'message' && core.messaging.getMessage(i.ref_id ?? '')?.sender_type === 'owner');
-  out.push(
-    ownerMsg
-      ? 'When you are done, end your turn with your reply to the owner. AgentOS posts your final message to them, unless you already answered with send_message.'
-      : 'When you are done, end your turn with a 1-3 sentence summary of what you did (it is logged, not sent to anyone).',
-  );
+  if (cloud) {
+    out.push(
+      ownerMsg
+        ? 'When you are done, call finish_run with your reply to the owner as the summary (AgentOS posts it to them unless you already answered with send_message). Then stop.'
+        : 'When you are done, call finish_run with a 1-3 sentence summary of what you did. Then stop.',
+    );
+  } else {
+    out.push(
+      ownerMsg
+        ? 'When you are done, end your turn with your reply to the owner. AgentOS posts your final message to them, unless you already answered with send_message.'
+        : 'When you are done, end your turn with a 1-3 sentence summary of what you did (it is logged, not sent to anyone).',
+    );
+  }
 
   return { prompt: out.join('\n\n'), recovery: buildRecovery(core, agent, project, focusTask) };
 }

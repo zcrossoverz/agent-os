@@ -299,4 +299,21 @@ CREATE TABLE activity (
 CREATE INDEX idx_activity_project ON activity(project_id, id);
 `,
   },
+  {
+    version: 2,
+    sql: `
+-- Cloud agents: Claude Code on the web sessions started through a routine's API trigger.
+ALTER TABLE accounts ADD COLUMN cloud_token_hash TEXT;   -- AgentOS token the account's cloud environment sends (network secret)
+ALTER TABLE accounts ADD COLUMN fire_url TEXT;           -- routine API trigger URL (…/routines/trig_…/fire)
+ALTER TABLE accounts ADD COLUMN fire_token_enc TEXT;     -- routine trigger token, encrypted at rest
+CREATE INDEX idx_accounts_cloud_token ON accounts(cloud_token_hash);
+
+-- GitHub workspace: the GitHub repository is the shared workspace; merges go through the GitHub API.
+ALTER TABLE projects ADD COLUMN workspace_mode TEXT NOT NULL DEFAULT 'runner'; -- runner | github
+ALTER TABLE projects ADD COLUMN github_token_enc TEXT;
+
+ALTER TABLE runs ADD COLUMN session_url TEXT;
+ALTER TABLE runs ADD COLUMN last_activity_at TEXT;
+`,
+  },
 ];

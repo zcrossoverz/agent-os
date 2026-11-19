@@ -18,9 +18,11 @@ import {
 } from './types.js';
 
 const b = (v: unknown) => v === 1 || v === true;
+const omit = (r: Row, keys: string[]) => Object.fromEntries(Object.entries(r).filter(([k]) => !keys.includes(k)));
 
 export const toProject = (r: Row): Project => ({
-  ...(r as any),
+  ...(omit(r, ['github_token_enc']) as any),
+  has_github_token: !!r.github_token_enc,
   push_on_merge: b(r.push_on_merge),
   archived: b(r.archived),
   limits: { ...DEFAULT_LIMITS, ...parseJson(r.limits, {}) },
@@ -29,7 +31,9 @@ export const toProject = (r: Row): Project => ({
 export const toAgent = (r: Row): Agent => ({ ...(r as any), is_pm: b(r.is_pm), enabled: b(r.enabled) });
 
 export const toAccount = (r: Row): Account => ({
-  ...(r as any),
+  ...(omit(r, ['fire_token_enc', 'cloud_token_hash']) as any),
+  has_fire_token: !!r.fire_token_enc,
+  has_cloud_token: !!r.cloud_token_hash,
   usage: parseJson(r.usage, {}),
   auth: parseJson(r.auth, {}),
 });

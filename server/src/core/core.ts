@@ -13,6 +13,8 @@ import { MessagingService } from '../services/messaging.js';
 import { ApprovalService } from '../services/approvals.js';
 import { RunService } from '../services/runs.js';
 import { KnowledgeService } from '../services/knowledge.js';
+import { SecretBox } from './secrets.js';
+import { GitHubService } from '../services/github.js';
 
 export interface ServerConfig {
   dataDir: string;
@@ -28,6 +30,12 @@ export interface ServerConfig {
   webDir: string | null;
   /** Disable dashboard auth (tests / local-only dev). Never enable on a reachable host. */
   insecureNoAuth: boolean;
+  /** Cloud runs: fail a run whose Claude Code on the web session shows no AgentOS activity for this long. */
+  cloudIdleTimeoutSec: number;
+  /** Cloud runs: hard cap on a run's duration. */
+  cloudRunTimeoutSec: number;
+  /** GitHub REST API base URL (overridable for tests / GitHub Enterprise). */
+  githubApiUrl: string;
 }
 
 export function defaultConfig(input: Partial<ServerConfig> = {}): ServerConfig {
@@ -47,6 +55,9 @@ export function defaultConfig(input: Partial<ServerConfig> = {}): ServerConfig {
     runnerOfflineAfterSec: 90,
     webDir: null,
     insecureNoAuth: false,
+    cloudIdleTimeoutSec: Number(process.env.AGENTOS_CLOUD_IDLE_TIMEOUT_SEC ?? 30 * 60),
+    cloudRunTimeoutSec: Number(process.env.AGENTOS_CLOUD_RUN_TIMEOUT_SEC ?? 3 * 3600),
+    githubApiUrl: process.env.AGENTOS_GITHUB_API_URL ?? 'https://api.github.com',
     ...overrides,
   };
 }
@@ -98,9 +109,12 @@ export class Core {
   readonly approvals: ApprovalService;
   readonly runs: RunService;
   readonly knowledge: KnowledgeService;
+  readonly secrets: SecretBox;
+  readonly github: GitHubService;
 
   constructor(readonly config: ServerConfig) {
     this.db = new Db(config.dbFile);
+    this.secrets = new SecretBox(config.dataDir);
     this.projects = new ProjectService(this);
     this.accounts = new AccountService(this);
     this.runners = new RunnerService(this);
@@ -110,6 +124,7 @@ export class Core {
     this.approvals = new ApprovalService(this);
     this.runs = new RunService(this);
     this.knowledge = new KnowledgeService(this);
+    this.github = new GitHubService(this);
   }
 
   activity(

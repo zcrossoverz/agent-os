@@ -101,7 +101,7 @@ export class AgentService {
       throw badRequest(`An agent with handle @${slug} already exists in this project`);
     }
     if (['owner', 'team', 'pm', 'system', 'all'].includes(slug)) throw badRequest(`@${slug} is reserved`);
-    if (input.account_id) this.checkAccount(project.runner_id, input.account_id);
+    if (input.account_id) this.checkAccount(project, input.account_id);
     const id = newId('agt');
     const now = nowIso();
     this.db.tx(() => {
@@ -135,7 +135,7 @@ export class AgentService {
       if (patch[k] !== undefined) row[k] = patch[k];
     }
     if (patch.account_id !== undefined) {
-      if (patch.account_id) this.checkAccount(this.core.projects.get(a.project_id).runner_id, patch.account_id);
+      if (patch.account_id) this.checkAccount(this.core.projects.get(a.project_id), patch.account_id);
       row.account_id = patch.account_id || null;
     }
     row.updated_at = nowIso();
@@ -168,9 +168,18 @@ export class AgentService {
     return this.db.all('SELECT * FROM sessions WHERE agent_id = ? ORDER BY updated_at DESC', id);
   }
 
-  private checkAccount(projectRunnerId: string | null, accountId: string) {
+  private checkAccount(project: { runner_id: string | null; workspace_mode: string }, accountId: string) {
     const acc = this.core.accounts.get(accountId);
-    if (projectRunnerId && acc.runner_id && acc.runner_id !== projectRunnerId) {
+    if (acc.provider === 'claude-cloud') {
+      if (project.workspace_mode !== 'github') {
+        throw badRequest('Cloud agents (Claude Code on the web) work on a GitHub repository. Switch the project workspace to GitHub in project settings first.');
+      }
+      return;
+    }
+    if (project.workspace_mode === 'github') {
+      throw badRequest('This project uses a GitHub workspace, which is worked on by cloud agents. Runner-based accounts work on runner workspaces.');
+    }
+    if (project.runner_id && acc.runner_id && acc.runner_id !== project.runner_id) {
       throw badRequest(
         "This account lives on a different runner than the project's repository. Agents of a project share git worktrees, so their accounts must be on the project's runner.",
       );

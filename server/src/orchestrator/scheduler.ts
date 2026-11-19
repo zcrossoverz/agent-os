@@ -2,6 +2,7 @@ import type { Core } from '../core/core.js';
 import type { Agent, InboxItem, Project, Task } from '../core/types.js';
 import { log } from '../util/util.js';
 import { buildWakePrompt } from './prompts.js';
+import { CloudWorker } from './cloud.js';
 
 /** Inbox types that are about doing work on a task, in the order an agent should handle them. */
 const FOCUS_ORDER = ['changes_requested', 'merge_result', 'task_assigned', 'task_unblocked', 'review_requested', 'approval_decided', 'message', 'nudge'];
@@ -16,8 +17,11 @@ export class Scheduler {
   private pending = false;
   private running = false;
   private escalated = new Set<string>();
+  readonly cloud: CloudWorker;
 
-  constructor(private core: Core) {}
+  constructor(private core: Core) {
+    this.cloud = new CloudWorker(core);
+  }
 
   start() {
     this.timer = setInterval(() => this.tick(), this.core.config.schedulerIntervalMs);
@@ -48,6 +52,7 @@ export class Scheduler {
       this.core.runners.sweepOffline();
       this.core.runs.sweepTimeouts();
       for (const project of this.core.projects.list()) this.scheduleProject(project);
+      this.cloud.tick();
     } catch (e) {
       log('error', 'scheduler tick failed', { error: String((e as Error)?.stack ?? e) });
     } finally {

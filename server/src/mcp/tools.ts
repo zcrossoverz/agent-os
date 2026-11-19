@@ -3,8 +3,9 @@ import { z } from 'zod';
 import type { Core } from '../core/core.js';
 import type { Agent, Project, Run, Task } from '../core/types.js';
 import { evaluatePermission } from '../orchestrator/policy.js';
+import { buildSystemPrompt } from '../orchestrator/prompts.js';
 import type { MessageTarget } from '../services/messaging.js';
-import { HttpError, badRequest, truncate } from '../util/util.js';
+import { badRequest, truncate } from '../util/util.js';
 
 export interface McpContext {
   core: Core;
@@ -17,24 +18,57 @@ type ToolResult = { content: { type: 'text'; text: string }[]; isError?: boolean
 
 const ok = (data: unknown): ToolResult => ({ content: [{ type: 'text', text: typeof data === 'string' ? data : JSON.stringify(data, null, 1) }] });
 
-function wrap<A>(fn: (args: A) => unknown) {
-  return async (args: A): Promise<ToolResult> => {
-    try {
-      return ok(await fn(args));
-    } catch (e) {
-      const msg = e instanceof HttpError || e instanceof Error ? e.message : String(e);
-      return { content: [{ type: 'text', text: `Error: ${msg}` }], isError: true };
-    }
-  };
-}
-
 const taskRef = z.string().describe('Task key like "ABC-12" (or its id)');
 
 /** Build the per-request MCP server exposing AgentOS to one agent's run. */
-export function buildMcpServer(ctx: McpContext): McpServer {
-  const { core, run, agent, project } = ctx;
-  const actor = `agent:${agent.id}`;
-  const s = new McpServer({ name: 'agentos', version: '0.1.0' }, { instructions: `AgentOS coordination tools for ${agent.name} on project ${project.name}.` });
+/**
+ * How a request reaches its run. Runner runs carry a per-run token, so the context is known up
+ * front. Cloud runs (Claude Code on the web) authenticate with their account's AgentOS token
+ * (injected by the cloud environment's network secret) and identify their session with the
+ * X-AgentOS-Session header; their context is resolved per call, after start_run binds it.
+ */
+export interface McpAccess {
+  mode: 'runner' | 'cloud';
+  resolve(): McpContext;
+  bind?(runCode: string): McpContext;
+  onCall?(ctx: McpContext, tool: string, args: unknown, ok: boolean, text: string): void;
+}
+
+/** Build the per-request MCP server exposing AgentOS to one agent's run. */
+export function buildMcpServer(core: Core, access: McpAccess): McpServer {
+  // Each HTTP request gets its own server instance and handles one call at a time, so these are
+  // simply "the current call's context", assigned before every tool handler runs.
+  let run!: Run;
+  let agent!: Agent;
+  let project!: Project;
+  let actor = '';
+  const use = (c: McpContext) => {
+    run = c.run;
+    agent = c.agent;
+    project = c.project;
+    actor = `agent:${c.agent.id}`;
+    return c;
+  };
+  const s = new McpServer({ name: 'agentos', version: '0.1.0' }, { instructions: 'AgentOS coordination tools: tasks, messages, reviews, approvals and shared docs for your team.' });
+
+  const run$ = <A>(tool: string, fn: (args: A) => unknown, resolveCtx: (args: A) => McpContext = () => access.resolve()) => {
+    return async (args: A): Promise<ToolResult> => {
+      let c: McpContext | undefined;
+      try {
+        c = use(resolveCtx(args));
+        const out = ok(await fn(args));
+        access.onCall?.(c, tool, args, true, out.content[0].text);
+        return out;
+      } catch (e) {
+        const text = `Error: ${e instanceof Error ? e.message : String(e)}`;
+        if (c) access.onCall?.(c, tool, args, false, text);
+        return { content: [{ type: 'text', text }], isError: true };
+      }
+    };
+  };
+  const reg = <A>(tool: string, config: any, fn: (args: A) => unknown): void => {
+    s.registerTool(tool, config, run$(tool, fn) as any);
+  };
 
   const summarizeTask = (t: Task) => ({
     key: t.key,
@@ -68,10 +102,10 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     return { type: 'agent', agentId: a.id };
   };
 
-  s.registerTool(
+  reg(
     'get_project_overview',
     { description: 'Project summary: team roster with status, your assignments, board counts, pending approvals, and project settings. Call this first when you need orientation.', inputSchema: {} },
-    wrap(() => {
+    (() => {
       const tasks = core.tasks.list(project.id);
       const counts: Record<string, number> = {};
       for (const t of tasks) counts[t.status] = (counts[t.status] ?? 0) + 1;
@@ -91,7 +125,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     }),
   );
 
-  s.registerTool(
+  reg(
     'list_tasks',
     {
       description: 'List tasks on the board. Filter by status and/or assignee ("@handle" or "me"). Closed tasks are excluded unless include_closed is true.',
@@ -101,17 +135,17 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         include_closed: z.boolean().optional(),
       },
     },
-    wrap((a: { status?: any[]; assignee?: string; include_closed?: boolean }) => {
+    ((a: { status?: any[]; assignee?: string; include_closed?: boolean }) => {
       let assigneeId: string | undefined;
       if (a.assignee) assigneeId = a.assignee === 'me' ? agent.id : core.agents.resolve(project.id, a.assignee)?.id ?? '__none__';
       return core.tasks.list(project.id, { status: a.status, assigneeId, includeClosed: a.include_closed ?? false }).map(summarizeTask);
     }),
   );
 
-  s.registerTool(
+  reg(
     'get_task',
     { description: 'Full details of one task: description, acceptance criteria, dependencies, subtasks, branch, recent thread messages and commits.', inputSchema: { task: taskRef } },
-    wrap((a: { task: string }) => {
+    ((a: { task: string }) => {
       const t = core.tasks.resolve(project.id, a.task);
       const conv = core.messaging.taskConversation(t.id);
       return {
@@ -125,7 +159,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     }),
   );
 
-  s.registerTool(
+  reg(
     'create_task',
     {
       description:
@@ -143,10 +177,10 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         status: z.enum(['backlog', 'todo']).optional(),
       },
     },
-    wrap((a: any) => summarizeTask(core.tasks.create(project.id, a, actor))),
+    ((a: any) => summarizeTask(core.tasks.create(project.id, a, actor))),
   );
 
-  s.registerTool(
+  reg(
     'update_task',
     {
       description: 'Edit a task: title, description, acceptance criteria, priority, parent, dependencies, or status (PM/owner can set any status; assignees use the lifecycle tools).',
@@ -161,82 +195,95 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         status: z.enum(['backlog', 'todo', 'in_progress', 'blocked', 'done', 'cancelled']).optional(),
       },
     },
-    wrap((a: any) => {
+    ((a: any) => {
       const t = core.tasks.resolve(project.id, a.task);
       const { task: _t, ...patch } = a;
       return summarizeTask(core.tasks.update(t.id, patch, actor));
     }),
   );
 
-  s.registerTool(
+  reg(
     'assign_task',
     { description: 'Assign a task to an agent (and optionally a reviewer). The assignee is notified and woken when the task is actionable.', inputSchema: { task: taskRef, assignee: z.string().describe('@handle'), reviewer: z.string().optional() } },
-    wrap((a: { task: string; assignee: string; reviewer?: string }) => summarizeTask(core.tasks.assign(core.tasks.resolve(project.id, a.task).id, a.assignee, a.reviewer, actor))),
+    ((a: { task: string; assignee: string; reviewer?: string }) => summarizeTask(core.tasks.assign(core.tasks.resolve(project.id, a.task).id, a.assignee, a.reviewer, actor))),
   );
 
-  s.registerTool(
+  reg(
     'start_task',
     { description: 'Mark your task in progress. Returns the git branch to work on.', inputSchema: { task: taskRef } },
-    wrap((a: { task: string }) => {
+    ((a: { task: string }) => {
       const t = core.tasks.start(core.tasks.resolve(project.id, a.task).id, actor);
-      return { ...summarizeTask(t), instructions: `Work on branch ${t.branch}. If your worktree is not on it yet: git checkout ${t.branch} 2>/dev/null || git checkout -b ${t.branch} ${project.base_branch}` };
+      const instructions =
+        project.workspace_mode === 'github'
+          ? `Work on branch ${t.branch}: git fetch origin && (git checkout -B ${t.branch} origin/${t.branch} 2>/dev/null || git checkout -b ${t.branch} origin/${project.base_branch}). Commit with the task key, then git push -u origin ${t.branch} before submit_for_review.`
+          : `Work on branch ${t.branch}. If your worktree is not on it yet: git checkout ${t.branch} 2>/dev/null || git checkout -b ${t.branch} ${project.base_branch}`;
+      return { ...summarizeTask(t), instructions };
     }),
   );
 
-  s.registerTool(
+  reg(
     'submit_for_review',
     { description: 'Submit your finished, committed task for review. Summarize what changed, how you tested it, and anything the reviewer should look at.', inputSchema: { task: taskRef, summary: z.string() } },
-    wrap((a: { task: string; summary: string }) => {
-      const t = core.tasks.submitForReview(core.tasks.resolve(project.id, a.task).id, a.summary, actor);
+    (async (a: { task: string; summary: string }) => {
+      const task = core.tasks.resolve(project.id, a.task);
+      let commits: Awaited<ReturnType<typeof core.github.branchCommits>> = null;
+      if (project.workspace_mode === 'github' && core.github.token(project.id)) {
+        // Cloud sessions are ephemeral: only work pushed to GitHub survives. Check before review.
+        const branch = task.branch ?? core.tasks.branchName(task);
+        commits = await core.github.branchCommits(project, branch);
+        if (!commits?.length) throw badRequest(`GitHub shows no commits on ${branch} ahead of ${project.base_branch}. Commit your work and run: git push -u origin ${branch}. Then call submit_for_review again.`);
+      }
+      const t = core.tasks.submitForReview(task.id, a.summary, actor);
+      if (commits?.length) core.runs.recordCommits(run, commits, agent.id);
       const reviewer = core.tasks.reviewerFor(t);
       return { ...summarizeTask(t), next: reviewer ? `Review requested from @${reviewer.slug}.` : t.merge_state ? `Merge: ${t.merge_state}.` : 'Waiting for the owner.' };
     }),
   );
 
-  s.registerTool(
+  reg(
     'review_task',
     { description: 'Give your review verdict on a task in review. "approve" lets AgentOS merge it; "request_changes" sends it back to the assignee with your comments.', inputSchema: { task: taskRef, verdict: z.enum(['approve', 'request_changes']), comments: z.string() } },
-    wrap((a: { task: string; verdict: 'approve' | 'request_changes'; comments: string }) => summarizeTask(core.tasks.review(core.tasks.resolve(project.id, a.task).id, a.verdict, a.comments, actor))),
+    ((a: { task: string; verdict: 'approve' | 'request_changes'; comments: string }) => summarizeTask(core.tasks.review(core.tasks.resolve(project.id, a.task).id, a.verdict, a.comments, actor))),
   );
 
-  s.registerTool(
+  reg(
     'block_task',
     { description: 'Mark your task blocked with a precise reason (what you need, from whom). The PM is notified.', inputSchema: { task: taskRef, reason: z.string() } },
-    wrap((a: { task: string; reason: string }) => summarizeTask(core.tasks.block(core.tasks.resolve(project.id, a.task).id, a.reason, actor))),
+    ((a: { task: string; reason: string }) => summarizeTask(core.tasks.block(core.tasks.resolve(project.id, a.task).id, a.reason, actor))),
   );
 
-  s.registerTool(
+  reg(
     'checkpoint',
     { description: 'Save progress notes on your task. With continue=true, AgentOS wakes you again to keep working (use this when stopping before the task is finished).', inputSchema: { task: taskRef, notes: z.string(), continue: z.boolean() } },
-    wrap((a: { task: string; notes: string; continue: boolean }) => summarizeTask(core.tasks.checkpoint(core.tasks.resolve(project.id, a.task).id, a.notes, a.continue, actor))),
+    ((a: { task: string; notes: string; continue: boolean }) => summarizeTask(core.tasks.checkpoint(core.tasks.resolve(project.id, a.task).id, a.notes, a.continue, actor))),
   );
 
-  s.registerTool(
+  reg(
     'comment_on_task',
     { description: "Post a comment in a task's thread (visible to the assignee, reviewer, PM and owner).", inputSchema: { task: taskRef, body: z.string() } },
-    wrap((a: { task: string; body: string }) => {
+    ((a: { task: string; body: string }) => {
       const m = core.tasks.comment(core.tasks.resolve(project.id, a.task).id, a.body, actor);
       return { posted: m.id };
     }),
   );
 
-  s.registerTool(
+  reg(
     'send_message',
     {
       description:
         'Send a message through AgentOS. to: "owner" (the human), "pm", "@handle" (a teammate), "team" (everyone; does not wake them unless @mentioned), or a task key (that task\'s thread). Set expects_reply=false for FYIs. Mention @handles to pull someone in.',
       inputSchema: { to: z.string(), body: z.string(), expects_reply: z.boolean().optional() },
     },
-    wrap((a: { to: string; body: string; expects_reply?: boolean }) => {
+    ((a: { to: string; body: string; expects_reply?: boolean }) => {
       const m = core.messaging.send({ projectId: project.id, from: { agentId: agent.id }, to: resolveTarget(a.to), body: a.body, expectsReply: a.expects_reply ?? true, runId: run.id });
       return { delivered: true, message_id: m.id, note: a.expects_reply === false ? 'Delivered as FYI.' : 'Delivered. You will be woken when they reply; do not wait.' };
     }),
   );
 
-  s.registerTool(
+  reg(
     'read_messages',
     { description: 'Read recent messages of a conversation: with="owner", "@handle", "team", or a task key.', inputSchema: { with: z.string(), limit: z.number().int().min(1).max(100).optional() } },
-    wrap((a: { with: string; limit?: number }) => {
+    ((a: { with: string; limit?: number }) => {
       const t = resolveTarget(a.with);
       const conv =
         t.type === 'team'
@@ -252,7 +299,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     }),
   );
 
-  s.registerTool(
+  reg(
     'request_approval',
     {
       description:
@@ -265,7 +312,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
         task_keys: z.array(z.string()).optional().describe('For kind="plan": the backlog tasks to release when approved'),
       },
     },
-    wrap((a: { kind: any; title: string; description: string; task?: string; task_keys?: string[] }) => {
+    ((a: { kind: any; title: string; description: string; task?: string; task_keys?: string[] }) => {
       const task = a.task ? core.tasks.resolve(project.id, a.task) : undefined;
       const ap = core.approvals.request(
         { projectId: project.id, agentId: agent.id, runId: run.id, taskId: task?.id ?? null, kind: a.kind, title: a.title, description: a.description, payload: a.task_keys ? { task_ids: a.task_keys } : {} },
@@ -275,45 +322,87 @@ export function buildMcpServer(ctx: McpContext): McpServer {
     }),
   );
 
-  s.registerTool(
+  reg(
     'record_decision',
     { description: 'Record a technical decision in the project decision log (for decisions within your authority; use request_approval for ones that need the owner).', inputSchema: { title: z.string(), context: z.string(), decision: z.string(), task: z.string().optional() } },
-    wrap((a: { title: string; context: string; decision: string; task?: string }) => {
+    ((a: { title: string; context: string; decision: string; task?: string }) => {
       const d = core.knowledge.recordDecision(project.id, { title: a.title, context: a.context, decision: a.decision, taskId: a.task ? core.tasks.resolve(project.id, a.task).id : null }, actor);
       return { recorded: d.id };
     }),
   );
 
-  s.registerTool('list_docs', { description: 'List shared project docs (brief, plan, design notes, ...).', inputSchema: {} }, wrap(() => core.knowledge.listDocs(project.id)));
+  reg('list_docs', { description: 'List shared project docs (brief, plan, design notes, ...).', inputSchema: {} }, (() => core.knowledge.listDocs(project.id)));
 
-  s.registerTool(
+  reg(
     'read_doc',
     { description: 'Read a shared project doc by slug.', inputSchema: { slug: z.string() } },
-    wrap((a: { slug: string }) => {
+    ((a: { slug: string }) => {
       const d = core.knowledge.getDoc(project.id, a.slug);
       return `# ${d.title} (v${d.version}, updated by ${core.actorLabel(d.updated_by)} at ${d.updated_at})\n\n${d.body}`;
     }),
   );
 
-  s.registerTool(
+  reg(
     'write_doc',
     { description: 'Create or replace a shared project doc (markdown). Use it for the brief, the plan, design notes and anything teammates should know. Writes the whole document.', inputSchema: { slug: z.string(), title: z.string(), body: z.string() } },
-    wrap((a: { slug: string; title: string; body: string }) => {
+    ((a: { slug: string; title: string; body: string }) => {
       const d = core.knowledge.upsertDoc(project.id, a.slug, a.title, a.body, actor);
       return { saved: d.slug, version: d.version };
     }),
   );
 
-  // Not for direct use by the agent: Claude Code calls this through --permission-prompt-tool.
-  s.registerTool(
-    'permission_gate',
-    { description: 'Internal: AgentOS permission check for tool calls (invoked automatically by the runtime).', inputSchema: { tool_name: z.string(), input: z.record(z.string(), z.any()), tool_use_id: z.string().optional() } },
-    async (a: { tool_name: string; input: Record<string, unknown> }) => {
-      const fresh = core.runs.get(run.id);
-      const decision = evaluatePermission(core, fresh, agent, a.tool_name, a.input ?? {});
-      return { content: [{ type: 'text', text: JSON.stringify(decision) }] };
-    },
-  );
+  if (access.mode === 'runner') {
+    // Not for direct use by the agent: Claude Code calls this through --permission-prompt-tool.
+    s.registerTool(
+      'permission_gate',
+      { description: 'Internal: AgentOS permission check for tool calls (invoked automatically by the runtime).', inputSchema: { tool_name: z.string(), input: z.record(z.string(), z.any()), tool_use_id: z.string().optional() } },
+      async (a: { tool_name: string; input: Record<string, unknown> }) => {
+        const c = use(access.resolve());
+        const decision = evaluatePermission(core, core.runs.get(c.run.id), c.agent, a.tool_name, a.input ?? {});
+        return { content: [{ type: 'text', text: JSON.stringify(decision) }] };
+      },
+    );
+  }
+
+  if (access.mode === 'cloud') {
+    s.registerTool(
+      'start_run',
+      {
+        description:
+          'Call this first in every cloud session, with the AgentOS run code from your routine payload (run_…). It returns who you are on the team, your standing instructions, the project context and your assignment for this session.',
+        inputSchema: { run_code: z.string().describe('The AgentOS run code, e.g. run_abc123def456') },
+      },
+      run$(
+        'start_run',
+        () => {
+          core.runs.recordEvent(run.id, 'status', { phase: 'session_bound', session: run.provider_session_id });
+          core.activity(project.id, actor, 'run.cloud_started', `${agent.name} checked in from a cloud session`, { type: 'run', id: run.id });
+          return [
+            `# AgentOS briefing · run ${run.id}`,
+            buildSystemPrompt(core, agent, project),
+            '---',
+            String(run.payload?.recovery ?? ''),
+            '---',
+            run.prompt,
+          ].join('\n\n');
+        },
+        (a: { run_code: string }) => access.bind!(a.run_code),
+      ) as any,
+    );
+
+    s.registerTool(
+      'finish_run',
+      {
+        description:
+          'Call this when you have finished this session\'s assignment (or cannot continue). The summary is logged; if the owner messaged you, it is posted to them as your reply. After calling it, stop.',
+        inputSchema: { summary: z.string().describe('What you did, what is pending, and anything the owner or team should know') },
+      },
+      run$('finish_run', (a: { summary: string }) => {
+        core.runs.complete(run.id, { status: 'succeeded', resultText: a.summary, sessionId: run.provider_session_id ?? undefined });
+        return 'Run finished and recorded. Stop now; AgentOS will start a new session when there is more to do.';
+      }) as any,
+    );
+  }
 
   return s;
 }

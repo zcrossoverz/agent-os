@@ -2,9 +2,12 @@ import path from 'node:path';
 import type { Core } from '../core/core.js';
 import { toAccount } from '../core/mappers.js';
 import type { Account, AccountStatus, AuthSnapshot, Provider, UsageSnapshot } from '../core/types.js';
-import { badRequest, newId, notFound, nowIso } from '../util/util.js';
+import { badRequest, newId, newToken, notFound, nowIso, safeEqual, sha256 } from '../util/util.js';
 
-const PROVIDERS: Provider[] = ['claude-code', 'mock'];
+const PROVIDERS: Provider[] = ['claude-code', 'claude-cloud', 'mock'];
+
+/** Providers whose runs execute on a runner (local git worktrees). claude-cloud runs on Anthropic's cloud. */
+export const RUNNER_PROVIDERS: Provider[] = ['claude-code', 'mock'];
 
 /** Auth methods that mean API billing. If a runner reports one, the account is blocked. */
 export const API_BILLED_AUTH_METHODS = new Set(['api_key', 'api_key_helper', 'apiKeyHelper', 'console', 'auth_token', 'profile', 'federation', 'bedrock', 'vertex', 'foundry']);
@@ -31,16 +34,30 @@ export class AccountService {
     return r ? toAccount(r) : undefined;
   }
 
-  create(input: { name: string; provider: Provider; runner_id?: string | null; config_dir?: string | null; max_concurrent_runs?: number }): Account {
+  create(input: {
+    name: string;
+    provider: Provider;
+    runner_id?: string | null;
+    config_dir?: string | null;
+    max_concurrent_runs?: number;
+    fire_url?: string | null;
+    fire_token?: string | null;
+  }): Account & { cloud_token?: string } {
     if (!input.name?.trim()) throw badRequest('Account name is required');
     if (!PROVIDERS.includes(input.provider)) throw badRequest(`Unsupported provider ${input.provider}`);
-    const runnerId = input.runner_id ?? this.core.runners.defaultRunnerId();
+    const cloud = input.provider === 'claude-cloud';
+    if (cloud) {
+      if (!input.fire_url?.trim() || !input.fire_token?.trim()) throw badRequest('A cloud account needs the routine API trigger URL and its token (claude.ai/code/routines → your routine → API trigger)');
+      validateFireUrl(input.fire_url);
+    }
+    const runnerId = cloud ? null : (input.runner_id ?? this.core.runners.defaultRunnerId());
     const id = newId('acc');
-    let configDir = input.config_dir?.trim() || null;
+    let configDir = cloud ? null : input.config_dir?.trim() || null;
     if (!configDir && input.provider === 'claude-code') {
       // Default: a per-account directory inside the runner's data dir. The runner resolves '~runner/'.
       configDir = path.posix.join('~runner', 'accounts', id, 'claude');
     }
+    const cloudToken = cloud ? `aoc_${newToken(24)}` : undefined;
     const now = nowIso();
     this.db.insert('accounts', {
       id,
@@ -48,22 +65,62 @@ export class AccountService {
       provider: input.provider,
       runner_id: runnerId,
       config_dir: configDir,
-      status: input.provider === 'mock' ? 'ready' : 'unknown',
-      max_concurrent_runs: Math.max(1, Math.min(input.max_concurrent_runs ?? 1, 8)),
+      status: input.provider === 'mock' || cloud ? 'ready' : 'unknown',
+      max_concurrent_runs: Math.max(1, Math.min(input.max_concurrent_runs ?? (cloud ? 2 : 1), 8)),
+      fire_url: cloud ? input.fire_url!.trim() : null,
+      fire_token_enc: cloud ? this.core.secrets.encrypt(input.fire_token!.trim()) : null,
+      cloud_token_hash: cloudToken ? sha256(cloudToken) : null,
       created_at: now,
       updated_at: now,
     });
     this.core.activity(null, 'owner', 'account.created', `Account ${input.name} (${input.provider}) added`, { type: 'account', id });
     this.core.bus.change({ topic: 'accounts', id });
-    return this.get(id);
+    return cloudToken ? { ...this.get(id), cloud_token: cloudToken } : this.get(id);
   }
 
-  update(id: string, patch: Partial<Pick<Account, 'name' | 'runner_id' | 'config_dir' | 'max_concurrent_runs'>>): Account {
-    this.get(id);
-    this.db.update('accounts', id, { ...patch, updated_at: nowIso() });
+  update(id: string, patch: Partial<Pick<Account, 'name' | 'runner_id' | 'config_dir' | 'max_concurrent_runs' | 'fire_url'>> & { fire_token?: string | null }): Account {
+    const acc = this.get(id);
+    const { fire_token, ...rest } = patch;
+    const row: Record<string, any> = { ...rest, updated_at: nowIso() };
+    if (rest.fire_url !== undefined) {
+      if (acc.provider !== 'claude-cloud') throw badRequest('Only cloud accounts have a routine trigger');
+      if (rest.fire_url) validateFireUrl(rest.fire_url);
+    }
+    if (fire_token) {
+      if (acc.provider !== 'claude-cloud') throw badRequest('Only cloud accounts have a routine trigger');
+      row.fire_token_enc = this.core.secrets.encrypt(fire_token.trim());
+    }
+    this.db.update('accounts', id, row);
+    if (fire_token && ['auth_required', 'error'].includes(acc.status)) this.setStatus(id, 'ready', 'Routine token updated');
     this.core.bus.change({ topic: 'accounts', id });
     this.core.bus.kick();
     return this.get(id);
+  }
+
+  /** New AgentOS token for a cloud account (to paste into its cloud environment's network secret). */
+  rotateCloudToken(id: string): string {
+    const acc = this.get(id);
+    if (acc.provider !== 'claude-cloud') throw badRequest('Only cloud accounts have an AgentOS token');
+    const token = `aoc_${newToken(24)}`;
+    this.db.update('accounts', id, { cloud_token_hash: sha256(token), updated_at: nowIso() });
+    this.core.activity(null, 'owner', 'account.token_rotated', `AgentOS token for ${acc.name} rotated`, { type: 'account', id });
+    this.core.bus.change({ topic: 'accounts', id });
+    return token;
+  }
+
+  /** The cloud account behind a bearer token sent by a Claude Code on the web session. */
+  byCloudToken(token: string | undefined): Account | undefined {
+    if (!token?.startsWith('aoc_')) return undefined;
+    const h = sha256(token);
+    const r = this.db.get('SELECT * FROM accounts WHERE cloud_token_hash = ? AND provider = ?', h, 'claude-cloud');
+    return r && safeEqual(r.cloud_token_hash, h) ? toAccount(r) : undefined;
+  }
+
+  fireCredentials(id: string): { url: string; token: string } {
+    const r = this.db.get<{ fire_url: string | null; fire_token_enc: string | null }>('SELECT fire_url, fire_token_enc FROM accounts WHERE id = ?', id);
+    const token = this.core.secrets.decrypt(r?.fire_token_enc ?? null);
+    if (!r?.fire_url || !token) throw badRequest('Cloud account has no routine trigger configured');
+    return { url: r.fire_url, token };
   }
 
   remove(id: string) {
@@ -132,11 +189,25 @@ export class AccountService {
     if (acc.status === 'rate_limited') return { ok: false, reason: acc.status_detail ?? 'rate limited' };
     if (acc.status === 'auth_required') return { ok: false, reason: 'account needs sign-in on its runner' };
     if (acc.status === 'billing_blocked') return { ok: false, reason: 'billing guard blocked this account (API credentials detected)' };
-    if (!acc.runner_id) return { ok: false, reason: 'account has no runner' };
-    const runner = this.core.runners.find(acc.runner_id);
-    if (!runner || runner.status !== 'online') return { ok: false, reason: 'runner offline' };
+    if (acc.provider !== 'claude-cloud') {
+      if (!acc.runner_id) return { ok: false, reason: 'account has no runner' };
+      const runner = this.core.runners.find(acc.runner_id);
+      if (!runner || runner.status !== 'online') return { ok: false, reason: 'runner offline' };
+    }
     const active = this.db.get<{ n: number }>("SELECT COUNT(*) AS n FROM runs WHERE account_id = ? AND status IN ('queued','running')", acc.id)!.n;
     if (active >= acc.max_concurrent_runs) return { ok: false, reason: 'account at max concurrency' };
     return { ok: true };
+  }
+}
+
+function validateFireUrl(url: string) {
+  let u: URL;
+  try {
+    u = new URL(url.trim());
+  } catch {
+    throw badRequest('The routine trigger URL is not a valid URL');
+  }
+  if (!['https:', 'http:'].includes(u.protocol) || !/\/fire\/?$/.test(u.pathname)) {
+    throw badRequest('Expected the routine API trigger URL, e.g. https://api.anthropic.com/v1/claude_code/routines/trig_…/fire');
   }
 }
