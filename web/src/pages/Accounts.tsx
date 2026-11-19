@@ -29,7 +29,7 @@ function UsageBars({ acc }: { acc: Account }) {
                 {pct}% {win.resetsAt ? <>· resets <RelTime iso={new Date(win.resetsAt * 1000).toISOString()} /></> : null}
               </span>
             </div>
-            <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+            <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-zinc-100 dark:bg-white/[0.06]">
               <div className={pct >= 90 ? 'h-full bg-red-500' : pct >= 70 ? 'h-full bg-amber-500' : 'h-full bg-emerald-500'} style={{ width: `${Math.min(100, pct)}%` }} />
             </div>
           </div>
@@ -66,7 +66,7 @@ export function AccountsPage() {
         </button>
       </div>
 
-      <div className="card mb-6 flex gap-3 border-indigo-200 bg-indigo-50/60 p-4 text-sm dark:border-indigo-900 dark:bg-indigo-950/30">
+      <div className="card mb-6 flex gap-3 border-indigo-200 bg-indigo-50/60 p-4 text-sm dark:border-indigo-400/20 dark:bg-indigo-400/[0.07]">
         <ShieldCheck className="mt-0.5 size-5 shrink-0 text-indigo-600 dark:text-indigo-400" />
         <div className="space-y-1 text-zinc-700 dark:text-zinc-300">
           <p>
@@ -115,7 +115,7 @@ export function AccountsPage() {
                   </div>
                   <span className={`rounded-md px-1.5 py-0.5 text-[11px] font-medium ${st.cls}`}>{st.label}</span>
                 </div>
-                {(acc.status_detail || acc.auth?.problem) && acc.status !== 'ready' && <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">{acc.status_detail ?? acc.auth?.problem}</div>}
+                {(acc.status_detail || acc.auth?.problem) && acc.status !== 'ready' && <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-400/[0.07] dark:text-amber-300">{acc.status_detail ?? acc.auth?.problem}</div>}
                 {acc.provider === 'claude-code' && (
                   <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
                     <div>
@@ -168,7 +168,7 @@ export function AccountsPage() {
       </SectionTitle>
       <div className="card overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-zinc-50 text-left text-xs text-zinc-500 dark:bg-zinc-900/60">
+          <thead className="bg-zinc-50 text-left text-xs text-zinc-500 dark:bg-ink-925/70">
             <tr>
               <th className="px-4 py-2 font-medium">Runner</th>
               <th className="px-4 py-2 font-medium">Status</th>
@@ -178,7 +178,7 @@ export function AccountsPage() {
               <th />
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+          <tbody className="divide-y divide-zinc-100 dark:divide-white/[0.05]">
             {runners.data!.map((r) => (
               <tr key={r.id}>
                 <td className="px-4 py-2">
@@ -273,7 +273,7 @@ function AddAccountModal({ open, onClose, runners, onCloudCreated }: { open: boo
         </Field>
         {cloud ? (
           <>
-            <div className="rounded-lg bg-zinc-50 p-3 text-xs text-zinc-600 dark:bg-zinc-800/50 dark:text-zinc-400">
+            <div className="rounded-lg bg-zinc-50 p-3 text-xs text-zinc-600 dark:bg-white/[0.04] dark:text-zinc-400">
               Leave the routine fields empty on first setup. Creating the account gives you the AgentOS token that the routine's cloud environment needs. The setup guide opens next. Once the routine exists, add its Fire URL and token with “Routine trigger”.
             </div>
             <Field label="Routine Fire URL (optional now)">
@@ -326,7 +326,7 @@ function LoginModal({ acc, runner, onClose }: { acc: Account; runner?: Runner; o
         <p className="text-zinc-500">
           Equivalent wrapper: <code className="kbd">agentos login '{acc.config_dir}'</code>. To sign in a second account, use its own directory. Each directory keeps its own login, so your two subscriptions stay independent.
         </p>
-        <details className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+        <details className="rounded-lg border border-zinc-200 p-3 dark:border-white/[0.06]">
           <summary className="cursor-pointer font-medium">Headless alternative: long-lived token</summary>
           <p className="mt-2 text-zinc-600 dark:text-zinc-400">
             On any machine, run <code className="kbd">claude setup-token</code> (requires a subscription). Save the printed token on the runner in <code className="kbd">{dir}/agentos-oauth-token</code> (mode 600). The runner reads it locally. It is never sent to the control plane.

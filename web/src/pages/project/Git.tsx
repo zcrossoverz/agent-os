@@ -19,11 +19,11 @@ export function GitPage() {
       </div>
       <section>
         <SectionTitle>Task branches</SectionTitle>
-        <div className="card divide-y divide-zinc-100 dark:divide-zinc-800">
+        <div className="card divide-y divide-zinc-100 dark:divide-white/[0.05]">
           {g.branches.map((b) => {
             const a = agent(b.assignee_id);
             return (
-              <button key={b.branch} onClick={() => openTask(b.task.id)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+              <button key={b.branch} onClick={() => openTask(b.task.id)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-zinc-50 dark:hover:bg-white/[0.04]">
                 <GitBranch className="size-4 shrink-0 text-zinc-400" />
                 <code className="min-w-0 flex-1 truncate font-mono text-xs">{b.branch}</code>
                 <span className="w-16 text-xs text-zinc-500">{b.task.key}</span>
@@ -39,7 +39,7 @@ export function GitPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <section>
           <SectionTitle>Commits by agents</SectionTitle>
-          <div className="card divide-y divide-zinc-100 dark:divide-zinc-800">
+          <div className="card divide-y divide-zinc-100 dark:divide-white/[0.05]">
             {g.commits.map((c) => {
               const a = agent(c.agent_id);
               return (
@@ -59,7 +59,7 @@ export function GitPage() {
         </section>
         <section>
           <SectionTitle>Merges</SectionTitle>
-          <div className="card divide-y divide-zinc-100 dark:divide-zinc-800">
+          <div className="card divide-y divide-zinc-100 dark:divide-white/[0.05]">
             {g.merges.map((m) => (
               <div key={m.id} className="flex items-start gap-2.5 px-4 py-2 text-sm">
                 <GitMerge className="mt-0.5 size-4 shrink-0 text-zinc-400" />

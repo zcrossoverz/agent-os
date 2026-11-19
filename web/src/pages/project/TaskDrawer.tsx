@@ -76,7 +76,7 @@ function TaskDetail({ id, onClose }: { id: string; onClose: () => void }) {
 
   return (
     <>
-      <div className="flex items-start gap-3 border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
+      <div className="flex items-start gap-3 border-b border-zinc-200 px-6 py-4 dark:border-white/[0.06]">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-xs text-zinc-500">
             <span className="font-semibold">{t.key}</span>
@@ -126,9 +126,9 @@ function TaskDetail({ id, onClose }: { id: string; onClose: () => void }) {
 
       <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[1fr_17rem]">
         <div className="min-w-0 space-y-6 px-6 py-5">
-          {t.status === 'blocked' && <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950/50 dark:text-red-300">Blocked: {t.blocked_reason ?? 'no reason given'}</div>}
+          {t.status === 'blocked' && <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-400/[0.07] dark:text-red-300">Blocked: {t.blocked_reason ?? 'no reason given'}</div>}
           {t.status === 'in_review' && (
-            <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-900 dark:bg-violet-950/30">
+            <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-400/20 dark:bg-violet-400/[0.07]">
               <div className="text-sm font-medium">In review{t.merge_state ? ` · merge ${t.merge_state.replace('_', ' ')}` : ''}</div>
               <p className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">
                 {agent(t.reviewer_id)?.name ? `${agent(t.reviewer_id)!.name} is reviewing.` : 'The PM reviews by default.'} You can also review as the owner: approval merges <code className="kbd">{t.branch}</code> into <code className="kbd">{project.base_branch}</code>.
@@ -145,7 +145,7 @@ function TaskDetail({ id, onClose }: { id: string; onClose: () => void }) {
             </div>
           )}
           {(t.merge_state === 'conflict' || t.merge_state === 'failed') && (
-            <div className="flex items-center gap-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950/50 dark:text-red-300">
+            <div className="flex items-center gap-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-400/[0.07] dark:text-red-300">
               Merge {t.merge_state}. The assignee has been asked to rebase.
               <button className="btn btn-sm ml-auto" onClick={() => merge.mutate()}>
                 Retry merge
@@ -173,9 +173,9 @@ function TaskDetail({ id, onClose }: { id: string; onClose: () => void }) {
               Subtasks
             </SectionTitle>
             {t.subtasks.length ? (
-              <div className="card divide-y divide-zinc-100 dark:divide-zinc-800">
+              <div className="card divide-y divide-zinc-100 dark:divide-white/[0.05]">
                 {t.subtasks.map((s) => (
-                  <button key={s.id} onClick={() => openTask(s.id)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                  <button key={s.id} onClick={() => openTask(s.id)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-zinc-50 dark:hover:bg-white/[0.04]">
                     <span className="w-16 text-xs text-zinc-500">{s.key}</span>
                     <span className="flex-1 truncate">{s.title}</span>
                     <StatusChip status={s.status} />
@@ -194,7 +194,7 @@ function TaskDetail({ id, onClose }: { id: string; onClose: () => void }) {
                 const a = m.sender_type === 'agent' ? agent(m.sender_id) : undefined;
                 return (
                   <div key={m.id} className="flex gap-2.5">
-                    {m.sender_type === 'owner' ? <OwnerAvatar size="sm" /> : a ? <Avatar name={a.name} seed={a.id} size="sm" /> : <span className="size-6 shrink-0 rounded-full bg-zinc-200 dark:bg-zinc-700" />}
+                    {m.sender_type === 'owner' ? <OwnerAvatar size="sm" /> : a ? <Avatar name={a.name} seed={a.id} size="sm" /> : <span className="size-6 shrink-0 rounded-full bg-zinc-200 dark:bg-white/[0.1]" />}
                     <div className="min-w-0 flex-1">
                       <div className="text-xs text-zinc-500">
                         <span className="font-medium text-zinc-700 dark:text-zinc-300">{m.sender_type === 'owner' ? 'You' : (a?.name ?? 'AgentOS')}</span> · <RelTime iso={m.created_at} />
@@ -228,7 +228,7 @@ function TaskDetail({ id, onClose }: { id: string; onClose: () => void }) {
           </section>
         </div>
 
-        <aside className="space-y-5 border-l border-zinc-200 bg-zinc-50/60 px-5 py-5 text-sm dark:border-zinc-800 dark:bg-zinc-950/30">
+        <aside className="space-y-5 border-l border-zinc-200 bg-zinc-50/60 px-5 py-5 text-sm dark:border-white/[0.06] dark:bg-ink-950/40">
           <Prop label="Assignee">
             <select className="input" value={t.assignee_id ?? ''} onChange={(e) => patch.mutate({ assignee: e.target.value || null })}>
               <option value="">Unassigned</option>

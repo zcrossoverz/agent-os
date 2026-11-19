@@ -51,7 +51,7 @@ export function CloudSetupModal({ account, token, onClose }: { account: Account;
   return (
     <Modal open onClose={onClose} title={`Connect “${account.name}” to AgentOS (Claude Code on the web)`} width="max-w-3xl">
       {s && !s.reachable && (
-        <div className="mb-4 flex gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+        <div className="mb-4 flex gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-400/[0.07] dark:text-amber-200">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" />
           <div>
             AgentOS's public URL is <code className="kbd">{s.publicUrl}</code>. Cloud sessions run on Anthropic's servers and must reach AgentOS over <b>public HTTPS</b>. Deploy AgentOS on your VPS behind a domain and set <code className="kbd">AGENTOS_PUBLIC_URL</code> (see the operations guide), then come back to this guide.
@@ -68,7 +68,7 @@ export function CloudSetupModal({ account, token, onClose }: { account: Account;
           <p>
             In claude.ai/code, add a cloud environment, e.g. "AgentOS" (Limited network access is fine). Open <b>Network secrets → Add secret</b> and fill in:
           </p>
-          <div className="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-1 rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800">
+          <div className="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-1 rounded-lg border border-zinc-200 p-3 text-xs dark:border-white/[0.06]">
             <span className="text-zinc-500">Host</span>
             <code className="font-mono">{s?.host ?? '…'}</code>
             <span className="text-zinc-500">Header</span>
@@ -112,7 +112,7 @@ export function CloudSetupModal({ account, token, onClose }: { account: Account;
             ))}
         </Step>
       </ol>
-      <p className="mt-5 border-t border-zinc-200 pt-3 text-xs text-zinc-500 dark:border-zinc-800">
+      <p className="mt-5 border-t border-zinc-200 pt-3 text-xs text-zinc-500 dark:border-white/[0.06]">
         Each time an agent on this account has work, AgentOS fires the routine. Claude Code on the web starts a fresh session, which calls <code className="kbd">start_run</code> to get its briefing from AgentOS, works on a task branch, pushes, and reports back. Sessions count toward this account's normal subscription usage. Routines allow 30 fires per hour each and 100 per account.
       </p>
     </Modal>

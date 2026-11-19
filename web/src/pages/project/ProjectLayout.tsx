@@ -6,6 +6,7 @@ import { api, useAction } from '../../lib/api';
 import { useAgents, useProject } from '../../lib/queries';
 import type { AgentRow, ProjectWithStats } from '../../lib/types';
 import { Badge, Loading } from '../../components/ui';
+import { avatarColor } from '../../lib/format';
 import { ProjectOverview } from './ProjectOverview';
 import { BoardPage } from './Board';
 import { ChatPage } from './Chat';
@@ -55,21 +56,27 @@ export function ProjectLayout() {
     <NavLink
       to={to}
       end={to === base}
-      className={({ isActive }) => clsx('relative -mb-px flex items-center gap-1.5 border-b-2 px-1 pt-1 pb-2.5 text-sm whitespace-nowrap transition', isActive ? 'border-indigo-600 font-medium text-zinc-900 dark:text-white' : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200')}
+      className={({ isActive }) =>
+        clsx(
+          'relative -mb-px flex items-center gap-1.5 border-b-2 px-0.5 pt-1 pb-3 text-[13px] whitespace-nowrap transition',
+          isActive ? 'border-accent-500 font-medium text-zinc-900 dark:border-accent-400 dark:text-white' : 'border-transparent text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100',
+        )
+      }
     >
       {label}
-      {!!count && <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white">{count}</span>}
+      {!!count && <span className="rounded-full bg-amber-400/90 px-1.5 text-[10px] leading-4 font-semibold text-amber-950">{count}</span>}
     </NavLink>
   );
 
   return (
     <ProjectCtx.Provider value={ctx}>
       <div className="flex h-full flex-col">
-        <header className="border-b border-zinc-200 bg-white px-6 pt-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+        <header className="glass sticky top-0 z-20 border-b border-zinc-200/80 px-6 pt-5 dark:border-white/[0.06]">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="truncate text-lg font-semibold">{p.name}</h1>
+                <span className={clsx('flex size-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white shadow-[inset_0_0_0_1px_rgb(255_255_255/0.15)]', avatarColor(p.id))}>{p.name[0]?.toUpperCase()}</span>
+                <h1 className="truncate text-lg font-semibold tracking-tight">{p.name}</h1>
                 <Badge>{p.key}</Badge>
                 <Badge tone="indigo">{p.coordination_mode === 'pm_led' ? 'PM-led' : 'Collaborative'}</Badge>
               </div>
@@ -77,7 +84,7 @@ export function ProjectLayout() {
             </div>
             <AutonomySwitch project={p} />
           </div>
-          <nav className="mt-3 flex gap-5 overflow-x-auto scrollbar-thin">
+          <nav className="mt-4 flex gap-6 overflow-x-auto scrollbar-thin">
             {tab(base, 'Overview')}
             {tab(`${base}/board`, 'Board')}
             {tab(`${base}/chat`, 'Chat', p.stats.unansweredOwner)}
@@ -127,7 +134,7 @@ function AutonomySwitch({ project }: { project: ProjectWithStats }) {
     { v: 'autonomous', label: 'Autonomous', icon: Zap, hint: 'Agents plan, build, review and merge within guardrails.' },
   ];
   return (
-    <div className="flex rounded-lg border border-zinc-200 bg-zinc-50 p-0.5 dark:border-zinc-700 dark:bg-zinc-800">
+    <div className="flex rounded-xl border border-zinc-200 bg-zinc-100/80 p-1 dark:border-white/[0.06] dark:bg-white/[0.03]">
       {opts.map((o) => (
         <button
           key={o.v}
@@ -135,13 +142,13 @@ function AutonomySwitch({ project }: { project: ProjectWithStats }) {
           disabled={set.isPending}
           onClick={() => o.v !== project.autonomy && set.mutate(o.v)}
           className={clsx(
-            'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition',
+            'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition',
             project.autonomy === o.v
               ? o.v === 'paused'
-                ? 'bg-white text-zinc-800 shadow-xs dark:bg-zinc-700 dark:text-white'
+                ? 'bg-white text-zinc-800 shadow-sm dark:bg-white/[0.08] dark:text-white'
                 : o.v === 'supervised'
-                  ? 'bg-white text-amber-700 shadow-xs dark:bg-zinc-700 dark:text-amber-300'
-                  : 'bg-white text-emerald-700 shadow-xs dark:bg-zinc-700 dark:text-emerald-300'
+                  ? 'bg-white text-amber-700 shadow-sm dark:bg-amber-400/10 dark:text-amber-300 dark:ring-1 dark:ring-amber-400/25'
+                  : 'bg-white text-emerald-700 shadow-sm dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-1 dark:ring-emerald-400/25'
               : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200',
           )}
         >

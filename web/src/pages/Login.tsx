@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Sparkles } from 'lucide-react';
 import { api, queryClient } from '../lib/api';
 
 export function LoginPage() {
@@ -6,9 +7,10 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   return (
-    <div className="flex min-h-full items-center justify-center p-6">
+    <div className="relative flex min-h-full items-center justify-center overflow-hidden p-6">
+      <div className="pointer-events-none absolute top-1/4 left-1/2 size-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-500/20 blur-[120px]" />
       <form
-        className="card w-full max-w-sm p-6"
+        className="card animate-in relative w-full max-w-sm p-7 dark:bg-ink-900/90 dark:backdrop-blur-xl"
         onSubmit={async (e) => {
           e.preventDefault();
           setBusy(true);
@@ -23,10 +25,12 @@ export function LoginPage() {
           }
         }}
       >
-        <div className="mb-5 flex items-center gap-2.5">
-          <img src="/favicon.svg" className="size-9" alt="" />
+        <div className="mb-6 flex items-center gap-3">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-accent-400 via-accent-500 to-fuchsia-500 shadow-[0_6px_20px_-6px_rgb(109_106_240/0.8)]">
+            <Sparkles className="size-5 text-white" />
+          </div>
           <div>
-            <h1 className="text-base font-semibold">AgentOS</h1>
+            <h1 className="text-lg font-semibold tracking-tight">AgentOS</h1>
             <p className="text-xs text-zinc-500">Sign in as the project owner</p>
           </div>
         </div>

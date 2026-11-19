@@ -45,7 +45,7 @@ export function BoardPage() {
           <Plus className="size-3.5" /> New task
         </button>
       </div>
-      <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto px-6 py-4 scrollbar-thin">
+      <div className="flex min-h-0 flex-1 gap-2.5 overflow-x-auto px-6 py-4 scrollbar-thin">
         {COLUMNS.map((col) => (
           <div
             key={col}
@@ -64,12 +64,12 @@ export function BoardPage() {
                 move.mutate({ id, status: col });
               }
             }}
-            className={clsx('flex min-w-60 flex-1 flex-col rounded-xl bg-zinc-100/80 dark:bg-zinc-900/60', dragOver === col && 'ring-2 ring-indigo-400')}
+            className={clsx('flex min-w-[178px] flex-1 flex-col rounded-2xl border border-zinc-200/70 bg-zinc-100/60 dark:border-white/[0.04] dark:bg-white/[0.015]', dragOver === col && 'ring-2 ring-accent-500/60')}
           >
             <div className="flex items-center gap-2 px-3 pt-3 pb-2">
               <span className={clsx('size-2 rounded-full', STATUS_META[col].dot)} />
               <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">{STATUS_META[col].label}</span>
-              <span className="text-xs text-zinc-400">{byStatus[col]?.length ?? 0}</span>
+              <span className="rounded-full bg-zinc-200/70 px-1.5 text-[10px] leading-4 font-semibold text-zinc-500 tabular-nums dark:bg-white/[0.06] dark:text-zinc-400">{byStatus[col]?.length ?? 0}</span>
               {col !== 'in_review' && col !== 'done' && (
                 <button className="ml-auto text-zinc-400 hover:text-zinc-700" onClick={() => setCreating(col)} title="Add task">
                   <Plus className="size-3.5" />
@@ -85,11 +85,11 @@ export function BoardPage() {
                     draggable
                     onDragStart={(e) => e.dataTransfer.setData('text/task', t.id)}
                     onClick={() => openTask(t.id)}
-                    className="card cursor-pointer p-3 transition hover:border-indigo-300 hover:shadow-sm dark:hover:border-indigo-700"
+                    className="card card-hover animate-in cursor-pointer p-3 dark:bg-ink-850/90"
                   >
                     <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
                       <span className="font-medium">{t.key}</span>
-                      {t.kind === 'epic' && <span className="rounded bg-violet-100 px-1 text-violet-700 dark:bg-violet-950 dark:text-violet-300">epic</span>}
+                      {t.kind === 'epic' && <span className="rounded bg-violet-100 px-1 text-violet-700 dark:bg-violet-400/10 dark:text-violet-300 dark:ring-1 dark:ring-inset dark:ring-violet-400/20">epic</span>}
                       {t.parent_id && <span title="Subtask of">↳ {keyOf(t.parent_id)}</span>}
                       <span className="ml-auto">
                         <Priority p={t.priority} />
@@ -112,7 +112,7 @@ export function BoardPage() {
                         </span>
                       )}
                       {t.branch && <GitBranch className="size-3" />}
-                      {t.merge_state && t.merge_state !== 'merged' && <span className={clsx('ml-auto rounded px-1', t.merge_state === 'conflict' || t.merge_state === 'failed' ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300' : 'bg-zinc-200 dark:bg-zinc-800')}>{t.merge_state.replace('_', ' ')}</span>}
+                      {t.merge_state && t.merge_state !== 'merged' && <span className={clsx('ml-auto rounded px-1', t.merge_state === 'conflict' || t.merge_state === 'failed' ? 'bg-red-100 text-red-700 dark:bg-red-400/10 dark:text-red-300 dark:ring-1 dark:ring-inset dark:ring-red-400/20' : 'bg-zinc-200 dark:bg-white/[0.06]')}>{t.merge_state.replace('_', ' ')}</span>}
                     </div>
                   </div>
                 );

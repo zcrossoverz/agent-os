@@ -123,11 +123,11 @@ export function NewProjectPage() {
 
       <h2 className="mb-2 text-sm font-semibold">Team</h2>
       {accs.length === 0 && (
-        <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+        <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-400/[0.07] dark:text-amber-300">
           {form.workspace_mode === 'github' ? 'No cloud accounts yet. Add your Claude accounts as “Claude Code on the web” under Accounts & runners (you can assign them later).' : 'No runner accounts yet. Add one under Accounts & runners (you can assign it later).'}
         </div>
       )}
-      <div className="card mb-6 divide-y divide-zinc-100 dark:divide-zinc-800">
+      <div className="card mb-6 divide-y divide-zinc-100 dark:divide-white/[0.05]">
         {team.map((a, i) => (
           <div key={i} className="grid items-end gap-3 p-4 sm:grid-cols-[8rem_10rem_1fr_9rem_auto]">
             <Field label="Name">

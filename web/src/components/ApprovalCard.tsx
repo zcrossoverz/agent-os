@@ -28,9 +28,9 @@ export function ApprovalCard({ a, agentName, projectSlug, projectName, compact }
   const Icon = k.icon;
   const pending = a.status === 'pending';
   return (
-    <div className={clsx('card p-4', pending && 'border-amber-300/70 dark:border-amber-700/50')}>
+    <div className={clsx('card p-4', pending && 'border-amber-300/70 dark:border-amber-400/25')}>
       <div className="flex items-start gap-3">
-        <div className={clsx('mt-0.5 rounded-lg p-1.5', pending ? 'bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800')}>
+        <div className={clsx('mt-0.5 rounded-lg p-1.5', pending ? 'bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400 dark:ring-1 dark:ring-inset dark:ring-amber-400/20' : 'bg-zinc-100 text-zinc-500 dark:bg-white/[0.06]')}>
           <Icon className="size-4" />
         </div>
         <div className="min-w-0 flex-1">
@@ -51,7 +51,7 @@ export function ApprovalCard({ a, agentName, projectSlug, projectName, compact }
             {a.title}
           </button>
           <div className="text-xs text-zinc-500">Requested by {agentName ?? (a.agent_id ? 'an agent' : 'AgentOS')}</div>
-          {expanded && a.description && <Markdown className="mt-2 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-950/50">{a.description}</Markdown>}
+          {expanded && a.description && <Markdown className="mt-2 rounded-lg bg-zinc-50 p-3 dark:bg-ink-950/60">{a.description}</Markdown>}
           {!pending && a.decision_note && <div className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">Note: {a.decision_note}</div>}
           {pending && (
             <div className="mt-3 flex flex-wrap items-center gap-2">

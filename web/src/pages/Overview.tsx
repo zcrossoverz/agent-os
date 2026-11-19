@@ -1,10 +1,15 @@
 import { Link } from 'react-router-dom';
-import { CheckCircle2, MessageCircleQuestion, AlertOctagon, KeyRound, Ban, Plus, Server } from 'lucide-react';
+import { CheckCircle2, MessageCircleQuestion, AlertOctagon, KeyRound, Ban, Plus, Server, Activity, BellRing, Layers } from 'lucide-react';
 import { useOverview } from '../lib/queries';
 import { ApprovalCard } from '../components/ApprovalCard';
 import { ActivityList } from '../components/Activity';
-import { AgentStatus, Avatar, Badge, Empty, Loading, ProgressBar, RelTime, SectionTitle } from '../components/ui';
+import { AgentStatus, Avatar, Badge, Empty, Loading, ProgressBar, RelTime, SectionTitle, Stat } from '../components/ui';
 import { ACCOUNT_STATUS, STATUS_META } from '../lib/format';
+
+function greeting() {
+  const h = new Date().getHours();
+  return h < 5 ? 'Working late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+}
 
 export function OverviewPage() {
   const { data, isLoading } = useOverview();
@@ -19,25 +24,41 @@ export function OverviewPage() {
   const projectOf = (id: string) => data.projects.find((p) => p.id === id);
   const at = data.attention;
   const agentIssues = at.agents.filter((a) => a.status === 'error' || a.status === 'waiting');
+  const allAgents = data.projects.flatMap((p) => p.agents);
+  const totalAgents = allAgents.length;
+  const working = allAgents.filter((a) => a.status === 'running' || a.status === 'queued').length;
+  const waiting = at.approvals.length + at.unanswered.length;
+  const sum = (k: string) => data.projects.reduce((n, p) => n + (p.stats.tasks[k] ?? 0), 0);
+  const inFlight = sum('in_progress') + sum('in_review');
+  const blockedCount = sum('blocked');
+  const doneCount = sum('done');
   const nothing = !at.approvals.length && !at.unanswered.length && !agentIssues.length && !at.accounts.length && !at.blocked.length && !at.runners.length;
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-6">
-      <div className="mb-6 flex items-end justify-between">
+    <div className="mx-auto max-w-6xl px-8 py-8">
+      <div className="mb-7 flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold">Overview</h1>
-          <p className="text-sm text-zinc-500">What your agents are doing, and what needs you.</p>
+          <p className="eyebrow">{greeting()}</p>
+          <h1 className="mt-1 text-[26px] leading-tight font-semibold tracking-tight">Your AI team at a glance</h1>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">What your agents are doing, and what needs you.</p>
         </div>
         <Link to="/projects/new" className="btn btn-primary">
           <Plus className="size-4" /> New project
         </Link>
       </div>
 
+      <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat label="Agents working" value={`${working}/${totalAgents}`} tone="emerald" icon={<Activity className="size-4" />} sub={working ? 'running right now' : 'team idle'} />
+        <Stat label="Waiting on you" value={waiting} tone={waiting ? 'amber' : undefined} icon={<BellRing className="size-4" />} sub="approvals and questions" />
+        <Stat label="In progress" value={inFlight} tone="indigo" icon={<Layers className="size-4" />} sub={`${blockedCount} blocked`} />
+        <Stat label="Done" value={doneCount} icon={<CheckCircle2 className="size-4" />} sub={`across ${data.projects.length} project${data.projects.length === 1 ? '' : 's'}`} />
+      </div>
+
       <section className="mb-8">
         <SectionTitle>Needs your attention</SectionTitle>
         {nothing ? (
           <div className="card flex items-center gap-3 px-4 py-4 text-sm text-zinc-600 dark:text-zinc-400">
-            <CheckCircle2 className="size-5 text-emerald-500" /> All clear. Nothing is waiting on you.
+            <span className="flex size-8 items-center justify-center rounded-full bg-emerald-500/10"><CheckCircle2 className="size-4 text-emerald-500" /></span> All clear. Nothing is waiting on you.
           </div>
         ) : (
           <div className="grid gap-3 lg:grid-cols-2">
@@ -48,7 +69,7 @@ export function OverviewPage() {
             {at.unanswered.map((u) => {
               const p = projectOf(u.project_id);
               return (
-                <Link key={u.message_id} to={`/p/${p?.slug}/chat/${u.conversation_id}`} className="card flex gap-3 p-4 transition hover:border-indigo-300">
+                <Link key={u.message_id} to={`/p/${p?.slug}/chat/${u.conversation_id}`} className="card card-hover flex gap-3 p-4">
                   <MessageCircleQuestion className="mt-0.5 size-5 shrink-0 text-indigo-500" />
                   <div className="min-w-0">
                     <div className="text-xs text-zinc-500">
@@ -62,7 +83,7 @@ export function OverviewPage() {
             {agentIssues.map((a) => {
               const p = projectOf(a.project_id);
               return (
-                <Link key={a.id} to={`/p/${p?.slug}/agents`} className="card flex gap-3 p-4 transition hover:border-indigo-300">
+                <Link key={a.id} to={`/p/${p?.slug}/agents`} className="card card-hover flex gap-3 p-4">
                   <AlertOctagon className={a.status === 'error' ? 'mt-0.5 size-5 shrink-0 text-red-500' : 'mt-0.5 size-5 shrink-0 text-amber-500'} />
                   <div className="min-w-0 text-sm">
                     <div className="font-medium">
@@ -74,7 +95,7 @@ export function OverviewPage() {
               );
             })}
             {at.accounts.map((acc) => (
-              <Link key={acc.id} to="/accounts" className="card flex gap-3 p-4 transition hover:border-indigo-300">
+              <Link key={acc.id} to="/accounts" className="card card-hover flex gap-3 p-4">
                 <KeyRound className="mt-0.5 size-5 shrink-0 text-amber-500" />
                 <div className="min-w-0 text-sm">
                   <div className="flex items-center gap-2 font-medium">
@@ -85,7 +106,7 @@ export function OverviewPage() {
               </Link>
             ))}
             {at.runners.map((r) => (
-              <Link key={r.id} to="/accounts" className="card flex gap-3 p-4 transition hover:border-indigo-300">
+              <Link key={r.id} to="/accounts" className="card card-hover flex gap-3 p-4">
                 <Server className="mt-0.5 size-5 shrink-0 text-zinc-400" />
                 <div className="text-sm">
                   <div className="font-medium">Runner “{r.name}” is offline</div>
@@ -96,7 +117,7 @@ export function OverviewPage() {
             {at.blocked.map((t) => {
               const p = projectOf(t.project_id);
               return (
-                <Link key={t.id} to={`/p/${p?.slug}/board?task=${t.id}`} className="card flex gap-3 p-4 transition hover:border-indigo-300">
+                <Link key={t.id} to={`/p/${p?.slug}/board?task=${t.id}`} className="card card-hover flex gap-3 p-4">
                   <Ban className="mt-0.5 size-5 shrink-0 text-red-500" />
                   <div className="min-w-0 text-sm">
                     <div className="font-medium">
@@ -126,7 +147,7 @@ export function OverviewPage() {
               const total = Object.values(s).reduce((a, b) => a + b, 0);
               const working = p.agents.filter((a) => a.status === 'running');
               return (
-                <Link key={p.id} to={`/p/${p.slug}`} className="card block p-5 transition hover:border-indigo-300 dark:hover:border-indigo-700">
+                <Link key={p.id} to={`/p/${p.slug}`} className="card card-hover block p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">

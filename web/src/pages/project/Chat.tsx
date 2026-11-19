@@ -46,7 +46,7 @@ export function ChatPage() {
 
   const current = convs.data?.find((c) => c.id === conversationId);
   const item = (key: string, active: boolean, onClick: () => void, icon: React.ReactNode, label: React.ReactNode, sub?: React.ReactNode, right?: React.ReactNode) => (
-    <button key={key} onClick={onClick} className={clsx('flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition', active ? 'bg-white shadow-xs dark:bg-zinc-800' : 'hover:bg-white/60 dark:hover:bg-zinc-800/50')}>
+    <button key={key} onClick={onClick} className={clsx('flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition', active ? 'bg-white shadow-xs ring-1 ring-zinc-200 dark:bg-white/[0.06] dark:ring-white/[0.06]' : 'hover:bg-white/60 dark:hover:bg-white/[0.03]')}>
       {icon}
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{label}</div>
@@ -58,7 +58,7 @@ export function ChatPage() {
 
   return (
     <div className="flex h-full min-h-0">
-      <div className="flex w-72 shrink-0 flex-col gap-4 overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-3 scrollbar-thin dark:border-zinc-800 dark:bg-zinc-900/40">
+      <div className="flex w-72 shrink-0 flex-col gap-4 overflow-y-auto border-r border-zinc-200 bg-zinc-50 p-3 scrollbar-thin dark:border-white/[0.06] dark:bg-ink-925/60">
         <div>
           <div className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-zinc-500 uppercase">Direct</div>
           {agents.map((a) => {
@@ -121,7 +121,7 @@ function Thread({ conv }: { conv: ConversationRow }) {
 
   return (
     <>
-      <div className="flex items-center gap-3 border-b border-zinc-200 px-5 py-3 dark:border-zinc-800">
+      <div className="flex items-center gap-3 border-b border-zinc-200 px-5 py-3 dark:border-white/[0.06]">
         {other ? <Avatar name={other.name} seed={other.id} /> : <Users className="size-5 text-zinc-400" />}
         <div className="min-w-0">
           <div className="text-sm font-semibold">{other ? `${other.name} · ${other.role}` : conv.title}</div>
@@ -134,7 +134,7 @@ function Thread({ conv }: { conv: ConversationRow }) {
             const a = m.sender_type === 'agent' ? agent(m.sender_id) : undefined;
             if (m.sender_type === 'system')
               return (
-                <div key={m.id} className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                <div key={m.id} className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-400/[0.07] dark:text-amber-300">
                   {m.body}
                 </div>
               );
@@ -147,7 +147,7 @@ function Thread({ conv }: { conv: ConversationRow }) {
                     <span className="font-medium text-zinc-700 dark:text-zinc-300">{mine ? 'You' : (a?.name ?? 'Agent')}</span> · <RelTime iso={m.created_at} />
                     {m.kind === 'fyi' || (!m.expects_reply && !mine && m.kind === 'chat') ? '' : ''}
                   </div>
-                  <div className={clsx('inline-block rounded-2xl px-3.5 py-2 text-left', mine ? 'bg-indigo-600 text-white [&_code]:bg-indigo-500 [&_a]:text-white' : 'bg-white shadow-xs ring-1 ring-zinc-200 dark:bg-zinc-800 dark:ring-zinc-700')}>
+                  <div className={clsx('inline-block rounded-2xl px-3.5 py-2 text-left', mine ? 'rounded-tr-md bg-gradient-to-br from-accent-500 to-accent-600 text-white shadow-[0_6px_20px_-8px_rgb(109_106_240/0.6)] [&_a]:text-white [&_code]:bg-white/20' : 'rounded-tl-md bg-white shadow-xs ring-1 ring-zinc-200 dark:bg-ink-850 dark:ring-white/[0.06]')}>
                     <Markdown>{m.body}</Markdown>
                   </div>
                 </div>
@@ -169,7 +169,7 @@ function Thread({ conv }: { conv: ConversationRow }) {
       </div>
       {!readOnly && (
         <form
-          className="border-t border-zinc-200 px-5 py-3 dark:border-zinc-800"
+          className="border-t border-zinc-200 px-5 py-3 dark:border-white/[0.06]"
           onSubmit={(e) => {
             e.preventDefault();
             if (body.trim()) send.mutate();

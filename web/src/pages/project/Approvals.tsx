@@ -16,7 +16,7 @@ export function ApprovalsPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-6">
-      <div className="mb-4 flex gap-1 rounded-lg bg-zinc-100 p-1 text-sm dark:bg-zinc-800/60">
+      <div className="mb-4 flex gap-1 rounded-lg bg-zinc-100 p-1 text-sm dark:bg-white/[0.05]">
         {(
           [
             ['pending', `Pending (${pending.data?.length ?? 0})`],
@@ -24,7 +24,7 @@ export function ApprovalsPage() {
             ['decisions', 'Decision log'],
           ] as const
         ).map(([k, label]) => (
-          <button key={k} onClick={() => setTab(k)} className={clsx('flex-1 rounded-md px-3 py-1.5 font-medium transition', tab === k ? 'bg-white shadow-xs dark:bg-zinc-700' : 'text-zinc-500')}>
+          <button key={k} onClick={() => setTab(k)} className={clsx('flex-1 rounded-md px-3 py-1.5 font-medium transition', tab === k ? 'bg-white shadow-xs dark:bg-white/[0.1]' : 'text-zinc-500')}>
             {label}
           </button>
         ))}
@@ -60,7 +60,7 @@ export function ApprovalsPage() {
             <div key={d.id} className="card p-4">
               <div className="flex items-center justify-between gap-2">
                 <div className="font-medium">{d.title}</div>
-                <span className={clsx('rounded-md px-1.5 py-0.5 text-[11px]', d.status === 'accepted' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800')}>{d.status}</span>
+                <span className={clsx('rounded-md px-1.5 py-0.5 text-[11px]', d.status === 'accepted' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-1 dark:ring-inset dark:ring-emerald-400/20' : 'bg-zinc-100 text-zinc-600 dark:bg-white/[0.06]')}>{d.status}</span>
               </div>
               <div className="mt-0.5 text-xs text-zinc-500">
                 {d.decided_by === 'owner' ? 'You' : (agent(d.decided_by.slice(6))?.name ?? d.decided_by)} · <RelTime iso={d.created_at} />

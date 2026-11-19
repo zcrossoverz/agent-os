@@ -22,12 +22,12 @@ export function KnowledgePage() {
   if (docs.isLoading) return <Loading />;
   return (
     <div className="flex h-full min-h-0">
-      <div className="w-64 shrink-0 overflow-y-auto border-r border-zinc-200 p-3 dark:border-zinc-800">
+      <div className="w-64 shrink-0 overflow-y-auto border-r border-zinc-200 p-3 dark:border-white/[0.06]">
         <button className="btn btn-sm mb-3 w-full" onClick={() => setCreating(true)}>
           <Plus className="size-3.5" /> New doc
         </button>
         {docs.data?.map((d) => (
-          <button key={d.slug} onClick={() => { setSlug(d.slug); setEditing(false); }} className={clsx('flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left', d.slug === slug ? 'bg-zinc-100 dark:bg-zinc-800' : 'hover:bg-zinc-50 dark:hover:bg-zinc-900')}>
+          <button key={d.slug} onClick={() => { setSlug(d.slug); setEditing(false); }} className={clsx('flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left', d.slug === slug ? 'bg-zinc-100 dark:bg-white/[0.06]' : 'hover:bg-zinc-50 dark:hover:bg-white/[0.03]')}>
             <FileText className="mt-0.5 size-4 shrink-0 text-zinc-400" />
             <div className="min-w-0">
               <div className="truncate text-sm font-medium">{d.title}</div>

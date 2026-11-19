@@ -28,13 +28,13 @@ export const PRIORITY = [
 ];
 
 export const STATUS_META: Record<string, { label: string; dot: string; chip: string }> = {
-  backlog: { label: 'Backlog', dot: 'bg-zinc-400', chip: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' },
-  todo: { label: 'To do', dot: 'bg-sky-500', chip: 'bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300' },
-  in_progress: { label: 'In progress', dot: 'bg-amber-500', chip: 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300' },
-  in_review: { label: 'In review', dot: 'bg-violet-500', chip: 'bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300' },
-  blocked: { label: 'Blocked', dot: 'bg-red-500', chip: 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300' },
-  done: { label: 'Done', dot: 'bg-emerald-500', chip: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' },
-  cancelled: { label: 'Cancelled', dot: 'bg-zinc-300', chip: 'bg-zinc-100 text-zinc-500 line-through dark:bg-zinc-800' },
+  backlog: { label: 'Backlog', dot: 'bg-zinc-400', chip: 'bg-zinc-100 text-zinc-700 dark:bg-white/[0.06] dark:text-zinc-300' },
+  todo: { label: 'To do', dot: 'bg-sky-500', chip: 'bg-sky-50 text-sky-700 dark:bg-sky-400/10 dark:text-sky-300 dark:ring-1 dark:ring-inset dark:ring-sky-400/20' },
+  in_progress: { label: 'In progress', dot: 'bg-amber-500', chip: 'bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-1 dark:ring-inset dark:ring-amber-400/20' },
+  in_review: { label: 'In review', dot: 'bg-violet-500', chip: 'bg-violet-50 text-violet-700 dark:bg-violet-400/10 dark:text-violet-300 dark:ring-1 dark:ring-inset dark:ring-violet-400/20' },
+  blocked: { label: 'Blocked', dot: 'bg-red-500', chip: 'bg-red-50 text-red-700 dark:bg-red-400/10 dark:text-red-300 dark:ring-1 dark:ring-inset dark:ring-red-400/20' },
+  done: { label: 'Done', dot: 'bg-emerald-500', chip: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-1 dark:ring-inset dark:ring-emerald-400/20' },
+  cancelled: { label: 'Cancelled', dot: 'bg-zinc-300', chip: 'bg-zinc-100 text-zinc-500 line-through dark:bg-white/[0.06]' },
 };
 
 export const AGENT_STATUS: Record<string, { label: string; dot: string; pulse?: boolean }> = {
@@ -46,12 +46,12 @@ export const AGENT_STATUS: Record<string, { label: string; dot: string; pulse?: 
 };
 
 export const ACCOUNT_STATUS: Record<string, { label: string; cls: string }> = {
-  unknown: { label: 'Checking…', cls: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300' },
-  ready: { label: 'Ready', cls: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' },
-  auth_required: { label: 'Sign-in required', cls: 'bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-300' },
-  rate_limited: { label: 'Usage limit', cls: 'bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300' },
-  billing_blocked: { label: 'Billing guard', cls: 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300' },
-  error: { label: 'Error', cls: 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300' },
+  unknown: { label: 'Checking…', cls: 'bg-zinc-100 text-zinc-600 dark:bg-white/[0.06] dark:text-zinc-300' },
+  ready: { label: 'Ready', cls: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-1 dark:ring-inset dark:ring-emerald-400/20' },
+  auth_required: { label: 'Sign-in required', cls: 'bg-amber-50 text-amber-800 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-1 dark:ring-inset dark:ring-amber-400/20' },
+  rate_limited: { label: 'Usage limit', cls: 'bg-orange-50 text-orange-700 dark:bg-orange-400/10 dark:text-orange-300 dark:ring-1 dark:ring-inset dark:ring-orange-400/20' },
+  billing_blocked: { label: 'Billing guard', cls: 'bg-red-50 text-red-700 dark:bg-red-400/10 dark:text-red-300 dark:ring-1 dark:ring-inset dark:ring-red-400/20' },
+  error: { label: 'Error', cls: 'bg-red-50 text-red-700 dark:bg-red-400/10 dark:text-red-300 dark:ring-1 dark:ring-inset dark:ring-red-400/20' },
 };
 
 const AVATAR_COLORS = ['bg-indigo-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-sky-500', 'bg-violet-500', 'bg-teal-500', 'bg-fuchsia-500', 'bg-orange-500', 'bg-cyan-600'];

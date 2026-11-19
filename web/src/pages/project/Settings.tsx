@@ -77,7 +77,7 @@ export function SettingsPage() {
               ['runner', 'Runner (local git)', 'Agents run the Claude Code CLI on a runner (your VPS or machine) in local git worktrees. AgentOS merges in the runner clone.'],
             ] as const
           ).map(([v, label, hint]) => (
-            <label key={v} className={`cursor-pointer rounded-xl border p-3 text-sm ${f.workspace_mode === v ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/30' : 'border-zinc-200 dark:border-zinc-800'}`}>
+            <label key={v} className={`cursor-pointer rounded-xl border p-3 text-sm ${f.workspace_mode === v ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-400/[0.07]' : 'border-zinc-200 dark:border-white/[0.06]'}`}>
               <input type="radio" className="mr-2" checked={f.workspace_mode === v} onChange={() => setF({ ...f, workspace_mode: v })} />
               <span className="font-medium">{label}</span>
               <p className="mt-1 text-xs text-zinc-500">{hint}</p>
@@ -85,7 +85,7 @@ export function SettingsPage() {
           ))}
         </div>
         {f.workspace_mode === 'github' && (
-          <div className="space-y-3 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+          <div className="space-y-3 rounded-xl border border-zinc-200 p-4 dark:border-white/[0.06]">
             <Field label="GitHub repository" hint="https://github.com/owner/repo">
               <input className="input font-mono text-xs" value={f.repo_url} onChange={(e) => setF({ ...f, repo_url: e.target.value })} placeholder="https://github.com/owner/repo" />
             </Field>
@@ -102,7 +102,7 @@ export function SettingsPage() {
               <span className="text-xs text-zinc-500">Save settings first if you changed the repository or token.</span>
             </div>
             {ghResult && (
-              <div className={`flex items-start gap-2 rounded-lg px-3 py-2 text-xs ${ghResult.ok ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'}`}>
+              <div className={`flex items-start gap-2 rounded-lg px-3 py-2 text-xs ${ghResult.ok ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-400/[0.07] dark:text-emerald-300' : 'bg-amber-50 text-amber-800 dark:bg-amber-400/[0.07] dark:text-amber-300'}`}>
                 {ghResult.ok ? <CheckCircle2 className="mt-0.5 size-3.5 shrink-0" /> : <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />}
                 {ghResult.text}
               </div>

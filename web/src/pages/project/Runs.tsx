@@ -35,9 +35,9 @@ export function RunsPage() {
 
   return (
     <div className="flex h-full min-h-0">
-      <div className="w-80 shrink-0 overflow-y-auto border-r border-zinc-200 scrollbar-thin dark:border-zinc-800">
+      <div className="w-80 shrink-0 overflow-y-auto border-r border-zinc-200 scrollbar-thin dark:border-white/[0.06]">
         {agentFilter && (
-          <div className="flex items-center justify-between border-b border-zinc-200 px-3 py-2 text-xs dark:border-zinc-800">
+          <div className="flex items-center justify-between border-b border-zinc-200 px-3 py-2 text-xs dark:border-white/[0.06]">
             Runs of {agent(agentFilter)?.name}
             <button className="text-indigo-600" onClick={() => nav(`/p/${project.slug}/runs`)}>
               Show all
@@ -50,7 +50,7 @@ export function RunsPage() {
             <button
               key={r.id}
               onClick={() => nav(`/p/${project.slug}/runs/${r.id}${agentFilter ? `?agent=${agentFilter}` : ''}`)}
-              className={clsx('flex w-full items-start gap-2.5 border-b border-zinc-100 px-3 py-2.5 text-left dark:border-zinc-800/70', r.id === runId ? 'bg-indigo-50/70 dark:bg-indigo-950/30' : 'hover:bg-zinc-50 dark:hover:bg-zinc-900')}
+              className={clsx('flex w-full items-start gap-2.5 border-b border-zinc-100 px-3 py-2.5 text-left dark:border-white/[0.05]', r.id === runId ? 'bg-indigo-50/70 dark:bg-indigo-400/[0.07]' : 'hover:bg-zinc-50 dark:hover:bg-white/[0.03]')}
             >
               {r.kind === 'merge' ? <GitMerge className="mt-0.5 size-6 text-zinc-400" /> : <Avatar name={a?.name ?? '?'} seed={a?.id} size="sm" />}
               <div className="min-w-0 flex-1">
@@ -123,9 +123,17 @@ function RunDetail({ id }: { id: string }) {
         )}
       </div>
 
-      {r.error_detail && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 font-mono text-xs whitespace-pre-wrap text-red-800 dark:bg-red-950/40 dark:text-red-300">{r.error_detail}</div>}
+      {r.error_detail && <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 font-mono text-xs whitespace-pre-wrap text-red-800 dark:bg-red-400/[0.07] dark:text-red-300">{r.error_detail}</div>}
 
-      {r.kind === 'agent' && (
+      {r.kind === 'agent' && r.session_url && (
+        <div className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+          <Metric label="Where" value="Claude Code on the web" />
+          <Metric label="Duration" value={dur != null ? humanDuration(dur) : '—'} />
+          <Metric label="AgentOS calls" value={events.data?.filter((e) => e.type === 'tool_use').length ?? '—'} />
+          <Metric label="Billing" value="Subscription" hint="Cloud sessions always use the account's subscription" />
+        </div>
+      )}
+      {r.kind === 'agent' && !r.session_url && (
         <div className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-5">
           <Metric label="Turns" value={r.usage.numTurns ?? '—'} />
           <Metric label="Output tokens" value={r.usage.outputTokens?.toLocaleString() ?? '—'} />
@@ -135,7 +143,7 @@ function RunDetail({ id }: { id: string }) {
         </div>
       )}
 
-      <div className="mt-4 flex gap-4 border-b border-zinc-200 text-sm dark:border-zinc-800">
+      <div className="mt-4 flex gap-4 border-b border-zinc-200 text-sm dark:border-white/[0.06]">
         {(['log', 'prompt', 'git'] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={clsx('-mb-px border-b-2 pb-2 capitalize', tab === t ? 'border-indigo-600 font-medium' : 'border-transparent text-zinc-500')}>
             {t === 'prompt' ? 'Why it ran' : t}
@@ -148,7 +156,7 @@ function RunDetail({ id }: { id: string }) {
           {events.data?.map((e) => <EventLine key={e.seq} e={e} />)}
           {events.data?.length === 0 && <div className="py-6 text-center text-sm text-zinc-500">{r.status === 'queued' ? 'Waiting for a runner…' : 'No events.'}</div>}
           {r.result_text && !events.data?.some((e) => e.type === 'assistant_text' && String(e.data.text).trim() === r.result_text!.trim()) && (
-            <div className="mt-4 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+            <div className="mt-4 rounded-xl border border-zinc-200 p-4 dark:border-white/[0.06]">
               <div className="mb-1 text-xs font-semibold text-zinc-500 uppercase">Final summary</div>
               <Markdown>{r.result_text}</Markdown>
             </div>
@@ -159,7 +167,7 @@ function RunDetail({ id }: { id: string }) {
       {tab === 'prompt' && (
         <div className="mt-3 space-y-3">
           <p className="text-xs text-zinc-500">The wake-up message AgentOS sent to the agent. It shows exactly why the agent ran and what it was asked to look at. A fresh session also received a context-recovery preamble.</p>
-          <pre className="overflow-x-auto rounded-lg bg-zinc-100 p-4 font-mono text-xs whitespace-pre-wrap dark:bg-zinc-900">{r.prompt}</pre>
+          <pre className="overflow-x-auto rounded-lg bg-zinc-100 p-4 font-mono text-xs whitespace-pre-wrap dark:bg-ink-900">{r.prompt}</pre>
           {r.inbox?.length > 0 && (
             <div className="text-xs text-zinc-500">
               Consumed {r.inbox.length} inbox item(s): {r.inbox.map((i: any) => i.type).join(', ')}
@@ -179,7 +187,7 @@ function GitTab({ r }: { r: Run }) {
       {g.mergeResult && (
         <div>
           Merge result: <Badge tone={g.mergeResult === 'merged' ? 'emerald' : g.mergeResult === 'noop' ? 'zinc' : 'red'}>{g.mergeResult}</Badge> {g.pushed != null && <span className="text-xs text-zinc-500">· pushed: {String(g.pushed)}</span>}
-          {g.mergeDetail && <pre className="mt-2 rounded-lg bg-zinc-100 p-3 font-mono text-xs whitespace-pre-wrap dark:bg-zinc-900">{g.mergeDetail}</pre>}
+          {g.mergeDetail && <pre className="mt-2 rounded-lg bg-zinc-100 p-3 font-mono text-xs whitespace-pre-wrap dark:bg-ink-900">{g.mergeDetail}</pre>}
         </div>
       )}
       {g.branch && (
@@ -189,7 +197,7 @@ function GitTab({ r }: { r: Run }) {
         </div>
       )}
       {g.workspace && <div className="font-mono text-xs text-zinc-500">{g.workspace}</div>}
-      <div className="card divide-y divide-zinc-100 dark:divide-zinc-800">
+      <div className="card divide-y divide-zinc-100 dark:divide-white/[0.05]">
         {(g.commits ?? []).map((c) => (
           <div key={c.sha} className="px-3 py-2 text-xs">
             <span className="font-mono text-zinc-500">{c.sha.slice(0, 8)}</span> <span className="text-zinc-400">({c.branch})</span> {c.message}
@@ -203,7 +211,7 @@ function GitTab({ r }: { r: Run }) {
 
 function Metric({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
   return (
-    <div className="rounded-lg border border-zinc-200 px-3 py-2 dark:border-zinc-800" title={hint}>
+    <div className="rounded-xl border border-zinc-200 bg-white/50 px-3 py-2.5 dark:border-white/[0.06] dark:bg-white/[0.02]" title={hint}>
       <div className="text-zinc-500">{label}</div>
       <div className="truncate font-medium tabular-nums">{value}</div>
     </div>
@@ -216,7 +224,7 @@ function EventLine({ e }: { e: RunEvent }) {
   switch (e.type) {
     case 'assistant_text':
       return (
-        <div className="rounded-lg bg-white px-3 py-2 ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-800">
+        <div className="rounded-lg bg-white px-3 py-2 ring-1 ring-zinc-200 dark:bg-ink-900 dark:ring-white/[0.06]">
           <Markdown>{String(d.text)}</Markdown>
         </div>
       );

@@ -79,7 +79,7 @@ export function ProjectOverview() {
 
         <section>
           <SectionTitle>Team</SectionTitle>
-          <div className="card divide-y divide-zinc-100 dark:divide-zinc-800">
+          <div className="card divide-y divide-zinc-100 dark:divide-white/[0.05]">
             {agents.map((a) => (
               <div key={a.id} className="flex items-center gap-3 px-4 py-2.5">
                 <Avatar name={a.name} seed={a.id} />
@@ -100,11 +100,11 @@ export function ProjectOverview() {
 
         <section>
           <SectionTitle>Active work</SectionTitle>
-          <div className="card divide-y divide-zinc-100 dark:divide-zinc-800">
+          <div className="card divide-y divide-zinc-100 dark:divide-white/[0.05]">
             {active.map((t) => {
               const a = agent(t.assignee_id);
               return (
-                <button key={t.id} onClick={() => openTask(t.id)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                <button key={t.id} onClick={() => openTask(t.id)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-zinc-50 dark:hover:bg-white/[0.04]">
                   <Priority p={t.priority} />
                   <span className="w-20 shrink-0 text-xs font-medium text-zinc-500">{t.key}</span>
                   <span className="min-w-0 flex-1 truncate text-sm">{t.title}</span>

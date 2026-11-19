@@ -15,7 +15,7 @@ const TONE: Record<string, string> = {
 export function ActivityList({ items, agentName, dense, onTask }: { items: ActivityEntry[]; agentName?: (id: string) => string | undefined; dense?: boolean; onTask?: (id: string) => void }) {
   if (!items.length) return <div className="px-4 py-6 text-center text-sm text-zinc-500">No activity yet.</div>;
   return (
-    <ol className="divide-y divide-zinc-100 dark:divide-zinc-800/80">
+    <ol className="divide-y divide-zinc-100 dark:divide-white/[0.05]">
       {items.map((e) => {
         const kind = e.type.split('.')[0];
         const failed = /failed|guard|rejected/.test(e.type);
