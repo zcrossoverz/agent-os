@@ -163,6 +163,28 @@ describe('scheduler', () => {
     expect(core.runs.list({ projectId: project.id })).toHaveLength(1); // one active run per agent
   });
 
+  it('hands a scarce run slot to waiting reviews first, then to whoever waited longest', () => {
+    const { core, project, pm, dev, dev2, reviewer, scheduler } = world();
+    core.projects.update(project.id, { limits: { maxConcurrentRuns: 1 } });
+    // Rev (created last) has a review waiting; Dev and Dee have plain messages, Dee's older than Dev's.
+    core.messaging.send({ projectId: project.id, from: 'owner', to: { type: 'agent', agentId: dev2.id }, body: 'older' });
+    core.messaging.send({ projectId: project.id, from: 'owner', to: { type: 'agent', agentId: dev.id }, body: 'newer' });
+    const t = core.tasks.create(project.id, { title: 'Reviewed work', assignee: 'dev', reviewer: 'rev' }, `agent:${pm.id}`);
+    core.tasks.start(t.id, `agent:${dev.id}`);
+    core.tasks.submitForReview(t.id, 'done', `agent:${dev.id}`);
+    core.db.run("UPDATE inbox SET status = 'done' WHERE agent_id = ? AND type <> 'message'", dev.id); // only the plain message stays
+    expect(pendingWake(core, reviewer).some((i) => i.type === 'review_requested')).toBe(true);
+
+    const order: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      scheduler.tick();
+      const run = core.runs.list({ projectId: project.id, status: ['queued', 'running'] })[0];
+      order.push(core.agents.get(run.agent_id!).name);
+      core.runs.complete(run.id, { status: 'succeeded', resultText: 'ok' });
+    }
+    expect(order).toEqual(['Rev', 'Dee', 'Dev']);
+  });
+
   it('does not run agents of paused projects or rate-limited accounts', () => {
     const { core, project, pm, scheduler } = world();
     core.messaging.send({ projectId: project.id, from: 'owner', to: { type: 'agent', agentId: pm.id }, body: 'hi' });

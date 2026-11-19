@@ -71,8 +71,26 @@ export class Scheduler {
       return;
     }
     const agents = this.core.agents.list(project.id).filter((a) => a.enabled);
-    // The PM goes first so planning happens before execution when both have work.
-    agents.sort((a, b) => Number(b.is_pm) - Number(a.is_pm));
+    // When run slots are scarce, who goes first matters: going by list order let the first agents
+    // grab every freed slot while a reviewer created last starved. Order: the PM (planning before
+    // execution), then agents with a review waiting (it unblocks someone else's work), then the
+    // agent whose wake-up has waited longest; agents with only continuation work come last.
+    const waiting = new Map(
+      this.core.db
+        .all<{ agent_id: string; oldest: string; review: number }>(
+          "SELECT agent_id, MIN(created_at) AS oldest, MAX(type = 'review_requested') AS review FROM inbox WHERE project_id = ? AND status = 'pending' AND wake = 1 GROUP BY agent_id",
+          project.id,
+        )
+        .map((r) => [r.agent_id, r]),
+    );
+    agents.sort((a, b) => {
+      if (a.is_pm !== b.is_pm) return Number(b.is_pm) - Number(a.is_pm);
+      const wa = waiting.get(a.id);
+      const wb = waiting.get(b.id);
+      if (!wa || !wb) return Number(!!wb) - Number(!!wa);
+      if (wa.review !== wb.review) return wb.review - wa.review;
+      return wa.oldest.localeCompare(wb.oldest);
+    });
     for (const agent of agents) {
       if (this.core.runs.activeInProject(project.id) >= project.limits.maxConcurrentRuns) return;
       this.scheduleAgent(project, agent);
