@@ -16,7 +16,9 @@ You talk to an AI project manager. It plans, splits the work into tasks, hands t
 
 [Quick start](#-quick-start) · [How it works](#-how-it-works) · [Cloud mode](docs/cloud.md) · [Deploy](docs/operations.md) · [Architecture](docs/architecture.md) · [Roadmap](docs/roadmap.md)
 
-<img src="docs/screenshots/chat.png" alt="Talking to the AI project manager in the AgentOS dashboard" width="900" />
+<img src="docs/screenshots/overview.png" alt="AgentOS operations view: KPIs, run lanes per agent, tasks completed and an agent table" width="900" />
+
+<sub>Operations view with the bundled demo project (mock agents, simulated day of activity).</sub>
 
 </div>
 
@@ -42,11 +44,12 @@ Running several coding agents at once turns you into a switchboard: copy this pl
 | **Approvals and a permission gate** | Agents must ask before architectural, security, destructive or production-impacting actions. Risky tool calls are intercepted and wait for you. |
 | **Guardrails** | Loop guard for agent ping-pong, hourly run budgets, per-account concurrency, bounded auto-continuation, a global pause. |
 | **Reliability** | Usage limits pause an account until its window resets. Lost or crashed runs hand their work back. Sessions resume when possible and rebuild context when not. |
+| **Operations view** | Run lanes per agent on a time axis (see concurrency, idle gaps and failures at a glance), KPIs with deltas, tasks completed, and per-agent utilisation. |
 | **Dashboard** | Attention center, board, task detail, chat, agents, approvals and decision log, runs with live logs and "why it ran", activity, docs, git, settings. Works on phones too. |
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/overview.png" alt="Attention center" /><p align="center"><sub><b>Attention center</b>: what needs you, at a glance</sub></p></td>
+    <td width="50%"><img src="docs/screenshots/chat.png" alt="Chat with the project manager" /><p align="center"><sub><b>Chat</b>: give the PM an objective, get a plan back</sub></p></td>
     <td width="50%"><img src="docs/screenshots/task.png" alt="Task detail" /><p align="center"><sub><b>Task detail</b>: review, branch, commits, discussion</sub></p></td>
   </tr>
   <tr>
