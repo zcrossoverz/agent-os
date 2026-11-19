@@ -1,0 +1,6 @@
+# Caddy terminates TLS and proxies to AgentOS. Server-sent events need no buffering.
+agentos.example.com {
+	reverse_proxy 127.0.0.1:4600 {
+		flush_interval -1
+	}
+}

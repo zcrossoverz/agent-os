@@ -1,0 +1,26 @@
+# /etc/systemd/system/agentos-server.service — control plane (+ embedded runner) on a VPS.
+[Unit]
+Description=AgentOS control plane
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agentos
+WorkingDirectory=/opt/agentos
+Environment=NODE_ENV=production
+Environment=AGENTOS_DATA_DIR=/var/lib/agentos
+Environment=AGENTOS_HOST=127.0.0.1
+Environment=AGENTOS_PORT=4600
+Environment=AGENTOS_PUBLIC_URL=https://agentos.example.com
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning /opt/agentos/server/dist/cli.js server --embedded-runner
+Restart=on-failure
+RestartSec=5
+# Hardening: agents only need their data directory.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/agentos /tmp
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

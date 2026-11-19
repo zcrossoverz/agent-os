@@ -84,7 +84,7 @@ export function buildMcpServer(ctx: McpContext): McpServer {
           .map((a) => ({ name: a.name, handle: `@${a.slug}`, role: a.role, pm: a.is_pm, status: a.status, working_on: a.status_detail })),
         board: counts,
         your_tasks: tasks.filter((t) => t.assignee_id === agent.id && !['done', 'cancelled'].includes(t.status)).map(summarizeTask),
-        reviews_for_you: tasks.filter((t) => t.status === 'in_review' && core.tasks.reviewerFor(t)?.id === agent.id).map((t) => t.key),
+        reviews_for_you: tasks.filter((t) => t.status === 'in_review' && t.merge_state == null && core.tasks.reviewerFor(t)?.id === agent.id).map((t) => t.key),
         pending_approvals: core.approvals.list({ projectId: project.id, status: 'pending' }).map((a) => ({ number: a.number, kind: a.kind, title: a.title })),
         docs: core.knowledge.listDocs(project.id).map((d) => d.slug),
       };

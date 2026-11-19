@@ -1,0 +1,20 @@
+# /etc/systemd/system/agentos-runner.service — a remote runner (laptop, workstation, second server).
+# Put AGENTOS_SERVER_URL and AGENTOS_RUNNER_TOKEN in /etc/agentos/runner.env (mode 600).
+[Unit]
+Description=AgentOS runner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agentos
+WorkingDirectory=/opt/agentos
+EnvironmentFile=/etc/agentos/runner.env
+Environment=AGENTOS_RUNNER_DATA_DIR=/var/lib/agentos-runner
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning /opt/agentos/server/dist/cli.js runner
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

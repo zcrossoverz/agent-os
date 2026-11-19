@@ -219,6 +219,9 @@ export class Runner {
     emit('status', { phase: 'workspace', workspace, branch });
 
     const configDir = this.resolveConfigDir(account.configDir);
+    // Agents reach AgentOS's MCP endpoint through the same URL this runner already uses for the
+    // control plane, which is reachable by definition (the public URL may not be, e.g. inside Docker).
+    a.mcp = { ...a.mcp, url: new URL('mcp', this.opts.serverUrl.replace(/\/?$/, '/')).toString() };
     const mcpHost = new URL(a.mcp.url).hostname;
     const env = buildChildEnv({
       configDir,

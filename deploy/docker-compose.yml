@@ -1,0 +1,20 @@
+# Single-VPS deployment: control plane, dashboard and an embedded runner in one container.
+# Put a TLS reverse proxy (see deploy/Caddyfile) in front; the port is bound to localhost only.
+services:
+  agentos:
+    build: ..
+    image: agentos:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4600:4600"
+    environment:
+      # URL that remote runners use to reach this server (and agents' MCP clients on remote runners).
+      AGENTOS_PUBLIC_URL: "https://agentos.example.com"
+      # Optional: set the owner password from the environment instead of the generated one.
+      # AGENTOS_OWNER_PASSWORD: "change-me-to-something-long"
+      # Agents on the embedded runner reach the control plane locally:
+      AGENTOS_EMBEDDED_RUNNER: "1"
+    volumes:
+      - agentos-data:/data   # database, repositories, worktrees and Claude config dirs (credentials!)
+volumes:
+  agentos-data:

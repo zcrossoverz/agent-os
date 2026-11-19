@@ -125,6 +125,8 @@ describe('task rules', () => {
     core.tasks.submitForReview(t.id, 'done', `agent:${dev.id}`);
     core.tasks.review(t.id, 'approve', 'lgtm', `agent:${reviewer.id}`);
     expect(core.tasks.get(t.id).merge_state).toBe('pending_approval');
+    // Regression (seen in the UI walkthrough): an approved task waiting for merge must not be re-reviewed.
+    expect(() => core.tasks.review(t.id, 'approve', 'again', `agent:${reviewer.id}`)).toThrow(/already approved/);
     const ap = core.approvals.list({ status: 'pending' }).find((a) => a.kind === 'merge')!;
     core.approvals.decide(ap.id, 'approved', null);
     expect(core.tasks.get(t.id).merge_state).toBe('queued');

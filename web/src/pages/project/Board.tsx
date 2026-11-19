@@ -64,7 +64,7 @@ export function BoardPage() {
                 move.mutate({ id, status: col });
               }
             }}
-            className={clsx('flex w-72 shrink-0 flex-col rounded-xl bg-zinc-100/80 dark:bg-zinc-900/60', dragOver === col && 'ring-2 ring-indigo-400')}
+            className={clsx('flex min-w-60 flex-1 flex-col rounded-xl bg-zinc-100/80 dark:bg-zinc-900/60', dragOver === col && 'ring-2 ring-indigo-400')}
           >
             <div className="flex items-center gap-2 px-3 pt-3 pb-2">
               <span className={clsx('size-2 rounded-full', STATUS_META[col].dot)} />

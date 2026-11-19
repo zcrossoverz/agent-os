@@ -344,6 +344,7 @@ export class TaskService {
     const t = this.get(id);
     const agent = this.actorAgent(actor);
     if (t.status !== 'in_review') throw badRequest(`${t.key} is ${t.status}, not in review`);
+    if (t.merge_state && !['conflict', 'failed'].includes(t.merge_state)) throw badRequest(`${t.key} was already approved and is waiting to be merged (${t.merge_state.replace('_', ' ')})`);
     if (agent) {
       const allowed = this.reviewerFor(t)?.id === agent.id || agent.is_pm;
       if (!allowed) throw forbidden(`You are not the reviewer of ${t.key}`);

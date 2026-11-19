@@ -141,7 +141,7 @@ function RunDetail({ id }: { id: string }) {
         <div className="mt-3 space-y-1.5">
           {events.data?.map((e) => <EventLine key={e.seq} e={e} />)}
           {events.data?.length === 0 && <div className="py-6 text-center text-sm text-zinc-500">{r.status === 'queued' ? 'Waiting for a runner…' : 'No events.'}</div>}
-          {r.result_text && (
+          {r.result_text && !events.data?.some((e) => e.type === 'assistant_text' && String(e.data.text).trim() === r.result_text!.trim()) && (
             <div className="mt-4 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
               <div className="mb-1 text-xs font-semibold text-zinc-500 uppercase">Final summary</div>
               <Markdown>{r.result_text}</Markdown>
