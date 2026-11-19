@@ -151,6 +151,18 @@ describe('cloud mode (Claude Code on the web + GitHub)', () => {
     await unbound.close();
   }, 30000);
 
+  it('cancels a running cloud run immediately and hands its message back', async () => {
+    const { srv, cloud, api, project, pm } = await world();
+    const core = srv.core;
+    cloud.sessionsActive = false; // the session never calls AgentOS, like one that lost its MCP config
+    await api('POST', `/api/projects/${project.id}/messages`, { to: { type: 'agent', agentId: pm.id }, body: 'Status?' });
+    const running = await waitFor(() => core.runs.list({ projectId: project.id, status: ['running'] }).find((r) => r.provider_session_id), 15000, 'dispatched run');
+    const res = await api('POST', `/api/runs/${running.id}/cancel`);
+    expect(res.status).toBe('cancelled');
+    expect(core.runs.get(running.id).error_kind).toBe('cancelled');
+    expect(core.db.get<{ n: number }>("SELECT COUNT(*) AS n FROM inbox WHERE agent_id = ? AND status IN ('pending', 'delivered')", pm.id)!.n).toBe(1);
+  }, 20000);
+
   it('fails quiet sessions with a diagnosis and handles routine rate limits', async () => {
     const { srv, cloud, api, project, pm, accounts } = await world({ idleTimeoutSec: 1 });
     const core = srv.core;
@@ -159,8 +171,8 @@ describe('cloud mode (Claude Code on the web + GitHub)', () => {
     const failed = await waitFor(() => core.runs.list({ projectId: project.id, status: ['failed'] })[0], 15000, 'watchdog');
     expect(failed.error_kind).toBe('timeout');
     expect(failed.error_detail).toMatch(/never called AgentOS/);
-    // The message goes back to the inbox for a retry.
-    expect(core.db.get<{ n: number }>("SELECT COUNT(*) AS n FROM inbox WHERE agent_id = ? AND status = 'pending'", pm.id)!.n).toBe(1);
+    // The message goes back to the inbox for a retry (the scheduler may already have handed it to the next run).
+    expect(core.db.get<{ n: number }>("SELECT COUNT(*) AS n FROM inbox WHERE agent_id = ? AND status IN ('pending', 'delivered')", pm.id)!.n).toBe(1);
 
     cloud.respondWith = { status: 429, headers: { 'retry-after': '1800' }, body: { type: 'error', error: { type: 'rate_limit_error', message: 'Hourly fire limit reached' } } };
     const limited = await waitFor(() => core.runs.list({ projectId: project.id, status: ['failed'] }).find((r) => r.error_kind === 'rate_limit'), 15000, 'rate-limited run');

@@ -378,9 +378,19 @@ export class RunService {
     this.core.bus.change({ topic: 'commits', projectId: project.id });
   }
 
+  private isCloudRun(run: Run): boolean {
+    if (!run.account_id || run.runner_id) return false;
+    return !!this.db.get("SELECT 1 FROM accounts WHERE id = ? AND provider = 'claude-cloud'", run.account_id);
+  }
+
   cancel(runId: string, actor: string): Run {
     const run = this.get(runId);
     if (run.status === 'queued') {
+      this.complete(runId, { status: 'cancelled', errorKind: 'cancelled', errorDetail: `Cancelled by ${actor}` });
+    } else if (run.status === 'running' && this.isCloudRun(run)) {
+      // No runner polls the cancel flag for a cloud session, and the session itself may already be
+      // gone (it never reports back if it failed before start_run), so end the run here. Any later
+      // call from that session is refused because the run is no longer running.
       this.complete(runId, { status: 'cancelled', errorKind: 'cancelled', errorDetail: `Cancelled by ${actor}` });
     } else if (run.status === 'running') {
       this.db.update('runs', runId, { cancel_requested: true });
