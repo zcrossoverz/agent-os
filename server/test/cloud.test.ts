@@ -173,6 +173,16 @@ describe('cloud mode (Claude Code on the web + GitHub)', () => {
     expect(failed.error_detail).toMatch(/never called AgentOS/);
     // The message goes back to the inbox for a retry (the scheduler may already have handed it to the next run).
     expect(core.db.get<{ n: number }>("SELECT COUNT(*) AS n FROM inbox WHERE agent_id = ? AND status IN ('pending', 'delivered')", pm.id)!.n).toBe(1);
+    // A quiet session may mean the account ran out of usage: the account backs off instead of re-firing at once.
+    const acc = core.accounts.get(accounts.A.id);
+    expect(acc.status).toBe('rate_limited');
+    expect(acc.status_detail).toMatch(/Possibly out of usage/);
+    const until = Date.parse(acc.rate_limited_until!);
+    expect(until - Date.now()).toBeGreaterThan(14 * 60_000);
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(core.runs.list({ projectId: project.id, status: ['queued', 'running'] })).toHaveLength(0);
+    // Re-check clears the back-off for a cloud account with a trigger.
+    expect((await api('POST', `/api/accounts/${accounts.A.id}/reset-status`)).status).toBe('ready');
 
     cloud.respondWith = { status: 429, headers: { 'retry-after': '1800' }, body: { type: 'error', error: { type: 'rate_limit_error', message: 'Hourly fire limit reached' } } };
     const limited = await waitFor(() => core.runs.list({ projectId: project.id, status: ['failed'] }).find((r) => r.error_kind === 'rate_limit'), 15000, 'rate-limited run');

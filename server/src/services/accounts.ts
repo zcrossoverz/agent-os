@@ -178,6 +178,38 @@ export class AccountService {
     }
   }
 
+  /**
+   * Cloud mode cannot see subscription usage: a cloud session that runs out of usage simply goes
+   * quiet, and the watchdog fails it as a timeout. That is the only signal AgentOS gets, so treat a
+   * run of silent sessions as "possibly out of usage" and back the account off instead of firing
+   * its routine again straight away: 15 minutes after the first, doubling, at most 2 hours.
+   * A long session that legitimately went quiet also counts; Re-check clears the back-off.
+   */
+  noteSilentCloudSession(id: string): { streak: number; until: string } | null {
+    const acc = this.find(id);
+    if (!acc || acc.provider !== 'claude-cloud') return null;
+    const rows = this.db.all<{ error_kind: string | null }>(
+      "SELECT error_kind FROM runs WHERE account_id = ? AND kind = 'agent' AND finished_at IS NOT NULL AND status <> 'cancelled' ORDER BY finished_at DESC LIMIT 12",
+      id,
+    );
+    let streak = 0;
+    for (const r of rows) {
+      if (r.error_kind !== 'timeout') break;
+      streak++;
+    }
+    if (!streak) return null;
+    const minutes = Math.min(120, 15 * 2 ** (streak - 1));
+    const until = new Date(Date.now() + minutes * 60_000).toISOString();
+    const sessions = streak === 1 ? 'A cloud session' : `${streak} cloud sessions in a row`;
+    this.setStatus(
+      id,
+      'rate_limited',
+      `Possibly out of usage: ${sessions} went quiet without finishing. Next try ${until.slice(11, 16)} UTC. Check the session on claude.ai, or Re-check to try now.`,
+      until,
+    );
+    return { streak, until };
+  }
+
   /** Accounts whose rate limit has expired become ready again. */
   releaseExpiredLimits() {
     const now = nowIso();

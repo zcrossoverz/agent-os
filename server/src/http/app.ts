@@ -184,7 +184,19 @@ export async function buildApp(core: Core, auth: OwnerAuth): Promise<FastifyInst
 
   app.post('/api/accounts/:id/reset-status', async (req) => {
     const acc = core.accounts.get((req.params as any).id);
-    core.accounts.setStatus(acc.id, acc.provider === 'mock' ? 'ready' : 'unknown', 'Reset by owner');
+    if (acc.provider === 'claude-cloud') {
+      // Nothing to probe for a cloud account: clear any back-off and rely on the routine trigger.
+      const hasTrigger = (() => {
+        try {
+          return !!core.accounts.fireCredentials(acc.id);
+        } catch {
+          return false;
+        }
+      })();
+      core.accounts.setStatus(acc.id, hasTrigger ? 'ready' : 'auth_required', hasTrigger ? 'Reset by owner' : 'Routine trigger not set yet');
+    } else {
+      core.accounts.setStatus(acc.id, acc.provider === 'mock' ? 'ready' : 'unknown', 'Reset by owner');
+    }
     return core.accounts.get(acc.id);
   });
 

@@ -159,6 +159,7 @@ export class CloudWorker {
           ? `The cloud session stopped talking to AgentOS for ${Math.round(core.config.cloudIdleTimeoutSec / 60)} minutes without calling finish_run. It may still be running; check the session link.`
           : 'The cloud session never called AgentOS (start_run). Check that the repository has the AgentOS .mcp.json and that the routine\'s environment has the AgentOS network secret.';
       core.runs.complete(r.id, { status: 'failed', errorKind: 'timeout', errorDetail: detail });
+      if (r.account_id) core.accounts.noteSilentCloudSession(r.account_id);
     }
   }
 }

@@ -342,3 +342,30 @@ describe('metrics', () => {
     expect(m.agents.map((a) => a.name)).toContain('Rev');
   });
 });
+
+describe('cloud usage back-off', () => {
+  it('backs a cloud account off after silent sessions, doubling with each one in a row', () => {
+    const core = memoryCore();
+    const acc = core.accounts.create({ name: 'Cloud', provider: 'claude-cloud', fire_url: 'https://api.anthropic.com/v1/claude_code/routines/trig_x/fire', fire_token: 'sk-ant-oat01-x' });
+    const project = core.projects.create({ name: 'P', key: 'PP', workspace_mode: 'github', repo_url: 'https://github.com/acme/p', github_token: 'ghp_test' } as any);
+    const agent = core.agents.create(project.id, { name: 'Ann', role: 'Developer', account_id: acc.id });
+    let n = 0;
+    const run = (error: string | null, status = error ? 'failed' : 'succeeded') =>
+      core.db.run(
+        "INSERT INTO runs (id, project_id, kind, agent_id, account_id, status, trigger, prompt, payload, usage, git, queued_at, started_at, finished_at, error_kind) VALUES (?, ?, 'agent', ?, ?, ?, 'inbox', '', '{}', '{}', '{}', ?, ?, ?, ?)",
+        `run_${n}`, project.id, agent.id, acc.id, status, new Date(Date.now() - 1000 * (100 - n)).toISOString(), new Date(Date.now() - 1000 * (100 - n)).toISOString(), new Date(Date.now() - 1000 * (99 - n++)).toISOString(), error,
+      );
+    run(null);
+    expect(core.accounts.noteSilentCloudSession(acc.id)).toBeNull(); // last run succeeded: nothing to do
+    run('timeout');
+    const first = core.accounts.noteSilentCloudSession(acc.id)!;
+    expect(first.streak).toBe(1);
+    expect(Date.parse(first.until) - Date.now()).toBeGreaterThan(14 * 60_000);
+    expect(core.accounts.availability(core.accounts.get(acc.id)).ok).toBe(false);
+    run(null, 'cancelled'); // cancellations neither break nor extend the streak
+    run('timeout');
+    const second = core.accounts.noteSilentCloudSession(acc.id)!;
+    expect(second.streak).toBe(2);
+    expect(Date.parse(second.until) - Date.now()).toBeGreaterThan(29 * 60_000);
+  });
+});
