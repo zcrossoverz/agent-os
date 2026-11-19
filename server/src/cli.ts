@@ -9,6 +9,7 @@ import { Core, defaultConfig } from './core/core.js';
 import { OwnerAuth } from './http/auth.js';
 import { seedDemo } from './seed.js';
 import { buildChildEnv } from './runner/billing-guard.js';
+import { cliCommand } from './runner/cli-command.js';
 
 const HELP = `AgentOS — orchestration layer for teams of AI coding agents
 
@@ -114,7 +115,8 @@ async function main() {
     const configDir = r.resolveConfigDir(dir)!;
     process.stdout.write(`Signing in with Anthropic's own login flow into CLAUDE_CONFIG_DIR=${configDir}\nChoose your Claude subscription (not Console/API billing).\n\n`);
     const env = buildChildEnv({ configDir });
-    const child = spawn(values['claude-bin'] ?? 'claude', ['auth', 'login', '--claudeai'], { stdio: 'inherit', env });
+    const cmd = cliCommand(values['claude-bin'] ?? 'claude', ['auth', 'login', '--claudeai']);
+    const child = spawn(cmd.file, cmd.args, { stdio: 'inherit', env });
     child.on('exit', (code) => process.exit(code ?? 0));
     return;
   }

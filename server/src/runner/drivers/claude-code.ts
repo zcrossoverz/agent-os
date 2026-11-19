@@ -4,6 +4,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import type { RunCompletion, RunErrorKind, RunUsage, UsageSnapshot } from '../../core/types.js';
 import { initEventIsSafe } from '../billing-guard.js';
+import { cliCommand } from '../cli-command.js';
 import type { AgentDriver, DriverContext } from './types.js';
 import { newToken, truncate } from '../../util/util.js';
 
@@ -111,7 +112,8 @@ export class ClaudeCodeDriver implements AgentDriver {
     ctx.emit('status', { phase: 'starting', resume: resume ?? null, cli: this.opts.claudeBin });
 
     return new Promise((resolve) => {
-      const child = spawn(this.opts.claudeBin, args, { cwd: ctx.workspace, env: ctx.env, stdio: ['pipe', 'pipe', 'pipe'] });
+      const cmd = cliCommand(this.opts.claudeBin, args);
+      const child = spawn(cmd.file, cmd.args, { cwd: ctx.workspace, env: ctx.env, stdio: ['pipe', 'pipe', 'pipe'] });
       let result: Record<string, any> | null = null;
       let sessionId: string | null = null;
       let model: string | undefined;

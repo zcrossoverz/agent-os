@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { AuthSnapshot } from '../core/types.js';
+import { cliCommand } from './cli-command.js';
 
 /**
  * Billing guard: keeps subscription-backed agents on the subscription.
@@ -98,7 +99,8 @@ export function evaluateAuthStatus(status: Record<string, any>): AuthSnapshot {
 
 export function preflightAuth(claudeBin: string, env: NodeJS.ProcessEnv, cwd: string): Promise<AuthSnapshot> {
   return new Promise((resolve) => {
-    execFile(claudeBin, ['auth', 'status', '--json'], { env, cwd, timeout: 30_000 }, (err, stdout, stderr) => {
+    const cmd = cliCommand(claudeBin, ['auth', 'status', '--json']);
+    execFile(cmd.file, cmd.args, { env, cwd, timeout: 30_000 }, (err, stdout, stderr) => {
       try {
         const json = JSON.parse(String(stdout).trim());
         resolve(evaluateAuthStatus(json));

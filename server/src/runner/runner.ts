@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import type { AuthSnapshot, RunAssignment, RunCompletion, RunnerEvent, RunnerHeartbeat } from '../core/types.js';
 import { log, nowIso, sleep } from '../util/util.js';
 import { buildChildEnv, preflightAuth, readLocalOauthToken } from './billing-guard.js';
+import { cliCommand } from './cli-command.js';
 import { agentIdentity, GitError, Workspaces } from './git.js';
 import { ClaudeCodeDriver } from './drivers/claude-code.js';
 import { MockDriver } from './drivers/mock.js';
@@ -117,7 +118,8 @@ export class Runner {
   private info() {
     if (this.claudeVersion === undefined) {
       try {
-        this.claudeVersion = execFileSync(this.claudeBin, ['--version'], { timeout: 10_000, env: buildChildEnv({ configDir: null }) }).toString().trim();
+        const cmd = cliCommand(this.claudeBin, ['--version']);
+        this.claudeVersion = execFileSync(cmd.file, cmd.args, { timeout: 10_000, env: buildChildEnv({ configDir: null }) }).toString().trim();
       } catch {
         this.claudeVersion = null;
       }
