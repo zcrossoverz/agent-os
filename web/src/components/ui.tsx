@@ -170,17 +170,16 @@ export function SectionTitle({ children, action, className }: { children: ReactN
   );
 }
 
-export function Stat({ label, value, tone, sub, icon }: { label: string; value: ReactNode; tone?: 'red' | 'amber' | 'emerald' | 'indigo'; sub?: ReactNode; icon?: ReactNode }) {
-  const tc = tone ? { red: 'text-red-600 dark:text-red-400', amber: 'text-amber-600 dark:text-amber-300', emerald: 'text-emerald-600 dark:text-emerald-400', indigo: 'text-accent-600 dark:text-accent-400' }[tone] : '';
-  const ic = tone ? { red: 'bg-red-500/10 text-red-500', amber: 'bg-amber-500/10 text-amber-500', emerald: 'bg-emerald-500/10 text-emerald-500', indigo: 'bg-accent-500/10 text-accent-500' }[tone] : 'bg-zinc-500/10 text-zinc-500 dark:text-zinc-400';
+export function Stat({ label, value, tone, sub }: { label: string; value: ReactNode; tone?: 'red' | 'amber' | 'emerald' | 'indigo'; sub?: ReactNode; icon?: ReactNode }) {
+  const dot = tone ? { red: 'bg-[var(--viz-fail)]', amber: 'bg-[var(--viz-warn)]', emerald: 'bg-[var(--viz-good)]', indigo: 'bg-accent-500' }[tone] : null;
   return (
-    <div className="card px-4 py-3.5">
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{label}</div>
-        {icon && <span className={clsx('flex size-7 items-center justify-center rounded-lg', ic)}>{icon}</span>}
+    <div className="card px-4 py-3">
+      <div className="flex items-center gap-1.5 text-[12px] text-zinc-500 dark:text-zinc-400">
+        {dot && <span className={clsx('size-1.5 rounded-full', dot)} aria-hidden />}
+        {label}
       </div>
-      <div className={clsx('mt-1 text-[26px] leading-tight font-semibold tracking-tight tabular-nums', tc)}>{value}</div>
-      {sub && <div className="mt-0.5 text-xs text-zinc-500">{sub}</div>}
+      <div className="num mt-1.5 text-[24px] leading-none font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">{value}</div>
+      {sub && <div className="mt-1.5 text-[11px] text-zinc-500">{sub}</div>}
     </div>
   );
 }
@@ -234,5 +233,17 @@ export function CopyButton({ text, label = 'Copy' }: { text: string; label?: str
     >
       {done ? 'Copied' : label}
     </button>
+  );
+}
+
+/** The AgentOS mark: three run lanes of different lengths, as on the timeline. */
+export function LogoMark({ size = 28 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden className="shrink-0">
+      <rect width="32" height="32" rx="8" className="fill-zinc-900 dark:fill-white/[0.08]" />
+      <rect x="7" y="9" width="12" height="3.5" rx="1.75" fill="#8b8cf8" />
+      <rect x="11" y="14.25" width="14" height="3.5" rx="1.75" fill="#ffffff" opacity="0.92" />
+      <rect x="7" y="19.5" width="8" height="3.5" rx="1.75" fill="#ffffff" opacity="0.55" />
+    </svg>
   );
 }

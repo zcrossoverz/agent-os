@@ -311,3 +311,34 @@ describe('permission gate', () => {
     expect(check('Bash', { command: 'cd /data/worktrees/tp/other && git status' }).behavior).toBe('deny');
   });
 });
+
+describe('metrics', () => {
+  it('reports runs overlapping the window, the previous window and the review queue', async () => {
+    const { buildMetrics } = await import('../src/services/metrics.js');
+    const { core, project, pm, dev, reviewer, scheduler } = world();
+    const iso = (minsAgo: number) => new Date(Date.now() - minsAgo * 60_000).toISOString();
+    const add = (id: string, agentId: string, status: string, startAgo: number, endAgo: number | null) =>
+      core.db.run(
+        "INSERT INTO runs (id, project_id, kind, agent_id, status, trigger, prompt, payload, usage, git, queued_at, started_at, finished_at) VALUES (?, ?, 'agent', ?, ?, 'inbox', '', '{}', '{}', '{}', ?, ?, ?)",
+        id, project.id, agentId, status, iso(startAgo), iso(startAgo), endAgo === null ? null : iso(endAgo),
+      );
+    add('run_a', pm.id, 'succeeded', 120, 100); // in the 6h window
+    add('run_b', dev.id, 'failed', 30, 20); // in the window
+    add('run_c', dev.id, 'running', 5, null); // still running
+    add('run_d', dev.id, 'succeeded', 500, 480); // previous 6h window
+    add('run_e', dev.id, 'succeeded', 2000, 1990); // older than both
+    const t = core.tasks.create(project.id, { title: 'R', assignee: 'dev', reviewer: 'rev' }, `agent:${pm.id}`);
+    core.tasks.start(t.id, `agent:${dev.id}`);
+    core.tasks.submitForReview(t.id, 'done', `agent:${dev.id}`);
+    void scheduler;
+    void reviewer;
+
+    const m = buildMetrics(core, { projectId: project.id, hours: 6 });
+    expect(m.runs.map((r) => r.id).sort()).toEqual(['run_a', 'run_b', 'run_c']);
+    expect(m.previous).toMatchObject({ runs: 1, succeeded: 1, failed: 0 });
+    expect(m.previous.busySec).toBeGreaterThan(1150);
+    expect(m.reviewQueue.map((r) => r.key)).toEqual([t.key]);
+    expect(m.concurrencyLimit).toBe(project.limits.maxConcurrentRuns);
+    expect(m.agents.map((a) => a.name)).toContain('Rev');
+  });
+});

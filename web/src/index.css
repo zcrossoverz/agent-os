@@ -7,14 +7,14 @@
   --font-sans: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
-  /* Dark surfaces: a near-black, slightly blue "ink" scale. */
-  --color-ink-950: #08090c;
-  --color-ink-925: #0b0c11;
-  --color-ink-900: #0f1016;
-  --color-ink-850: #13151c;
-  --color-ink-800: #181a23;
-  --color-ink-750: #1e212c;
-  --color-ink-700: #262a37;
+  /* Dark surfaces: a cool graphite scale, flat (no glow), so data carries the colour. */
+  --color-ink-950: #0b0d0f;
+  --color-ink-925: #0e1013;
+  --color-ink-900: #121518;
+  --color-ink-850: #161a1e;
+  --color-ink-800: #1b2025;
+  --color-ink-750: #222830;
+  --color-ink-700: #2b323a;
 
   /* Accent */
   --color-accent-400: #8b8cf8;
@@ -39,12 +39,37 @@
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'ss01';
     letter-spacing: -0.006em;
   }
-  /* A soft glow at the top of the canvas in dark mode. */
-  html.dark body {
-    background-image:
-      radial-gradient(1200px 500px at 15% -10%, rgb(109 106 240 / 0.10), transparent 60%),
-      radial-gradient(900px 400px at 100% 0%, rgb(56 189 248 / 0.05), transparent 60%);
-    background-attachment: fixed;
+  /* Chart tokens. Run outcomes: running = blue, succeeded = a quiet neutral (the norm),
+     failed = red (the exception). Validated for CVD and contrast on each mode's panel. */
+  :root {
+    --viz-surface: #ffffff;
+    --viz-grid: #ecebe6;
+    --viz-axis: #c3c2b7;
+    --viz-muted: #898781;
+    --viz-ink: #0b0b0b;
+    --viz-ink-2: #52514e;
+    --viz-series: #2a78d6;
+    --viz-running: #2a78d6;
+    --viz-ok: #a3acb4;
+    --viz-fail: #d03b3b;
+    --viz-warn: #fab219;
+    --viz-good: #0ca30c;
+    --viz-now: #6d6af0;
+  }
+  html.dark {
+    --viz-surface: #121518;
+    --viz-grid: #1f252b;
+    --viz-axis: #2f373f;
+    --viz-muted: #7d868d;
+    --viz-ink: #e7eaec;
+    --viz-ink-2: #a7afb5;
+    --viz-series: #3987e5;
+    --viz-running: #3987e5;
+    --viz-ok: #8d979f;
+    --viz-fail: #d03b3b;
+    --viz-warn: #fab219;
+    --viz-good: #0ca30c;
+    --viz-now: #8b8cf8;
   }
   h1,
   h2,
@@ -68,7 +93,19 @@
 
 @layer components {
   .card {
-    @apply rounded-xl border border-zinc-200/80 bg-white shadow-[0_1px_2px_rgb(0_0_0/0.04)] dark:border-white/[0.06] dark:bg-ink-900/80 dark:shadow-[inset_0_1px_0_0_rgb(255_255_255/0.03),0_1px_2px_rgb(0_0_0/0.4)];
+    @apply rounded-lg border border-zinc-200 bg-white dark:border-white/[0.07] dark:bg-ink-900;
+  }
+  /* A panel: a card with a header row (title left, controls right) and a hairline under it. */
+  .panel-head {
+    @apply flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 border-b border-zinc-200 px-4 py-2 dark:border-white/[0.07];
+  }
+  .panel-title {
+    @apply text-[13px] font-semibold tracking-tight text-zinc-900 dark:text-zinc-100;
+  }
+  /* Numbers that line up: readouts, table cells, axis ticks. */
+  .num {
+    @apply font-mono tabular-nums;
+    font-feature-settings: 'zero' 0;
   }
   .card-hover {
     @apply transition duration-150 hover:border-zinc-300 hover:shadow-md dark:hover:border-white/[0.12] dark:hover:bg-ink-850/90;
@@ -80,7 +117,7 @@
     @apply inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition duration-150 hover:bg-zinc-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-zinc-200 dark:shadow-none dark:hover:border-white/[0.14] dark:hover:bg-white/[0.08];
   }
   .btn-primary {
-    @apply border-transparent bg-gradient-to-b from-accent-500 to-accent-600 text-white shadow-[0_1px_2px_rgb(0_0_0/0.15),inset_0_1px_0_rgb(255_255_255/0.15)] hover:from-accent-400 hover:to-accent-500 dark:border-transparent dark:from-accent-500 dark:to-accent-600 dark:text-white dark:shadow-[0_0_0_1px_rgb(139_140_248/0.25),0_4px_16px_-4px_rgb(109_106_240/0.55),inset_0_1px_0_rgb(255_255_255/0.18)] dark:hover:from-accent-400 dark:hover:to-accent-500;
+    @apply border-transparent bg-accent-600 text-white shadow-none hover:bg-accent-500 dark:border-transparent dark:bg-accent-600 dark:text-white dark:shadow-none dark:hover:bg-accent-500;
   }
   .btn-danger {
     @apply border-transparent bg-red-600 text-white hover:bg-red-500 dark:border-transparent dark:bg-red-600 dark:hover:bg-red-500;
@@ -176,3 +213,16 @@
 .animate-in {
   animation: fade-in-up 0.18s ease-out both;
 }
+
+/* The leading edge of a running bar in the run lanes. */
+@keyframes lane-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.lane-pulse {
+  animation: lane-pulse 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lane-pulse { animation: none; }
+}
+

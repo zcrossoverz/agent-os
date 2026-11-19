@@ -10,14 +10,14 @@ interface Change {
 /** Which query-key roots depend on each change topic. */
 const TOPIC_KEYS: Record<string, string[]> = {
   projects: ['projects', 'project', 'overview'],
-  agents: ['agents', 'agent', 'overview', 'project'],
+  agents: ['agents', 'agent', 'overview', 'project', 'metrics'],
   accounts: ['accounts', 'overview', 'agents'],
   runners: ['runners', 'overview', 'accounts'],
-  tasks: ['tasks', 'task', 'overview', 'project', 'git'],
+  tasks: ['tasks', 'task', 'overview', 'project', 'git', 'metrics'],
   messages: ['messages', 'conversations', 'overview', 'task', 'project'],
   conversations: ['conversations'],
   approvals: ['approvals', 'overview', 'project', 'task'],
-  runs: ['runs', 'run', 'agents', 'agent', 'project', 'task', 'git'],
+  runs: ['runs', 'run', 'agents', 'agent', 'project', 'task', 'git', 'metrics'],
   run_events: ['runEvents'],
   activity: ['activity', 'overview', 'task'],
   docs: ['docs', 'doc'],

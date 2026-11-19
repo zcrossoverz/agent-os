@@ -11,6 +11,7 @@ import { OwnerAuth, SESSION_COOKIE, SESSION_MAX_AGE, parseCookies } from './auth
 import { HttpError, badRequest, forbidden, log, sleep, truncate } from '../util/util.js';
 import { ROLE_PRESETS } from '../services/agents.js';
 import { APPROVAL_KINDS } from '../services/approvals.js';
+import { buildMetrics } from '../services/metrics.js';
 import { ROUTINE_PROMPT, cloudRepoFiles, isPubliclyReachable, publicHost } from '../orchestrator/cloud.js';
 
 export const VERSION = '0.1.0';
@@ -391,6 +392,10 @@ export async function buildApp(core: Core, auth: OwnerAuth): Promise<FastifyInst
 
   // ---------------------------------------------------------------- runs, activity, git
 
+  app.get('/api/metrics', async (req) => {
+    const q = req.query as { project?: string; hours?: string };
+    return buildMetrics(core, { projectId: q.project ? core.projects.get(q.project).id : null, hours: q.hours ? Number(q.hours) : 24 });
+  });
   app.get('/api/projects/:id/runs', async (req) => {
     const q = req.query as any;
     return core.runs.list({ projectId: core.projects.get((req.params as any).id).id, agentId: q.agent, limit: q.limit ? Number(q.limit) : 100 });

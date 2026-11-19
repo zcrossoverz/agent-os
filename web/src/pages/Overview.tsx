@@ -1,15 +1,11 @@
 import { Link } from 'react-router-dom';
-import { CheckCircle2, MessageCircleQuestion, AlertOctagon, KeyRound, Ban, Plus, Server, Activity, BellRing, Layers } from 'lucide-react';
+import { CheckCircle2, MessageCircleQuestion, AlertOctagon, KeyRound, Ban, Plus, Server } from 'lucide-react';
 import { useOverview } from '../lib/queries';
 import { ApprovalCard } from '../components/ApprovalCard';
 import { ActivityList } from '../components/Activity';
-import { AgentStatus, Avatar, Badge, Empty, Loading, ProgressBar, RelTime, SectionTitle, Stat } from '../components/ui';
+import { AgentStatus, Avatar, Badge, Empty, Loading, ProgressBar, RelTime, SectionTitle } from '../components/ui';
+import { OperationsSection } from '../components/ops';
 import { ACCOUNT_STATUS, STATUS_META } from '../lib/format';
-
-function greeting() {
-  const h = new Date().getHours();
-  return h < 5 ? 'Working late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
-}
 
 export function OverviewPage() {
   const { data, isLoading } = useOverview();
@@ -24,34 +20,23 @@ export function OverviewPage() {
   const projectOf = (id: string) => data.projects.find((p) => p.id === id);
   const at = data.attention;
   const agentIssues = at.agents.filter((a) => a.status === 'error' || a.status === 'waiting');
-  const allAgents = data.projects.flatMap((p) => p.agents);
-  const totalAgents = allAgents.length;
-  const working = allAgents.filter((a) => a.status === 'running' || a.status === 'queued').length;
-  const waiting = at.approvals.length + at.unanswered.length;
-  const sum = (k: string) => data.projects.reduce((n, p) => n + (p.stats.tasks[k] ?? 0), 0);
-  const inFlight = sum('in_progress') + sum('in_review');
-  const blockedCount = sum('blocked');
-  const doneCount = sum('done');
+  const slugOf = (id: string) => projectOf(id)?.slug;
+  const nameOf = (id: string) => projectOf(id)?.name;
+  const totalAgents = data.projects.reduce((n, p) => n + p.agents.length, 0);
   const nothing = !at.approvals.length && !at.unanswered.length && !agentIssues.length && !at.accounts.length && !at.blocked.length && !at.runners.length;
 
   return (
-    <div className="mx-auto max-w-6xl px-8 py-8">
-      <div className="mb-7 flex items-end justify-between gap-4">
+    <div className="mx-auto max-w-[1400px] px-4 py-6 md:px-8">
+      <div className="mb-6 flex items-end justify-between gap-4">
         <div>
-          <p className="eyebrow">{greeting()}</p>
-          <h1 className="mt-1 text-[26px] leading-tight font-semibold tracking-tight">Your AI team at a glance</h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">What your agents are doing, and what needs you.</p>
+          <h1 className="text-[22px] leading-tight font-semibold tracking-tight">Overview</h1>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            <span className="num">{data.projects.length}</span> project{data.projects.length === 1 ? '' : 's'} · <span className="num">{totalAgents}</span> agent{totalAgents === 1 ? '' : 's'}. What they are doing, and what needs you.
+          </p>
         </div>
         <Link to="/projects/new" className="btn btn-primary">
           <Plus className="size-4" /> New project
         </Link>
-      </div>
-
-      <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Agents working" value={`${working}/${totalAgents}`} tone="emerald" icon={<Activity className="size-4" />} sub={working ? 'running right now' : 'team idle'} />
-        <Stat label="Waiting on you" value={waiting} tone={waiting ? 'amber' : undefined} icon={<BellRing className="size-4" />} sub="approvals and questions" />
-        <Stat label="In progress" value={inFlight} tone="indigo" icon={<Layers className="size-4" />} sub={`${blockedCount} blocked`} />
-        <Stat label="Done" value={doneCount} icon={<CheckCircle2 className="size-4" />} sub={`across ${data.projects.length} project${data.projects.length === 1 ? '' : 's'}`} />
       </div>
 
       <section className="mb-8">
@@ -131,6 +116,12 @@ export function OverviewPage() {
           </div>
         )}
       </section>
+
+      {data.projects.length > 0 && (
+        <div className="mb-8">
+          <OperationsSection projectId={null} slugOf={slugOf} nameOf={data.projects.length > 1 ? nameOf : undefined} />
+        </div>
+      )}
 
       <section className="mb-8">
         <SectionTitle>Projects</SectionTitle>

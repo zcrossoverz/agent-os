@@ -153,7 +153,7 @@ function Thread({ conv, onBack }: { conv: ConversationRow; onBack: () => void })
                     <span className="font-medium text-zinc-700 dark:text-zinc-300">{mine ? 'You' : (a?.name ?? 'Agent')}</span> · <RelTime iso={m.created_at} />
                     {m.kind === 'fyi' || (!m.expects_reply && !mine && m.kind === 'chat') ? '' : ''}
                   </div>
-                  <div className={clsx('inline-block rounded-2xl px-3.5 py-2 text-left', mine ? 'rounded-tr-md bg-gradient-to-br from-accent-500 to-accent-600 text-white shadow-[0_6px_20px_-8px_rgb(109_106_240/0.6)] [&_a]:text-white [&_code]:bg-white/20' : 'rounded-tl-md bg-white shadow-xs ring-1 ring-zinc-200 dark:bg-ink-850 dark:ring-white/[0.06]')}>
+                  <div className={clsx('inline-block rounded-2xl px-3.5 py-2 text-left', mine ? 'rounded-tr-md bg-accent-600 text-white [&_a]:text-white [&_code]:bg-white/20' : 'rounded-tl-md bg-white shadow-xs ring-1 ring-zinc-200 dark:bg-ink-850 dark:ring-white/[0.06]')}>
                     <Markdown>{m.body}</Markdown>
                   </div>
                 </div>

@@ -8,6 +8,7 @@ import { ActivityList } from '../../components/Activity';
 import { ApprovalCard } from '../../components/ApprovalCard';
 import { AgentStatus, Avatar, Empty, Priority, ProgressBar, SectionTitle, Stat, StatusChip } from '../../components/ui';
 import { STATUS_META } from '../../lib/format';
+import { OperationsSection } from '../../components/ops';
 
 export function ProjectOverview() {
   const { project, agents, agent, openTask } = useProjectCtx();
@@ -29,7 +30,8 @@ export function ProjectOverview() {
   const active = (tasks.data ?? []).filter((t) => ['in_progress', 'in_review', 'blocked'].includes(t.status));
 
   return (
-    <div className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[1fr_22rem]">
+    <div className="mx-auto max-w-[1400px] space-y-8 px-4 py-6 md:px-6">
+    <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
       <div className="min-w-0 space-y-6">
         {pm ? (
           <div className="card p-4">
@@ -76,7 +78,22 @@ export function ProjectOverview() {
           <Stat label="Waiting on you" value={project.stats.pendingApprovals + project.stats.unansweredOwner} tone={project.stats.pendingApprovals + project.stats.unansweredOwner ? 'amber' : undefined} sub="approvals + questions" />
         </div>
         <ProgressBar segments={['done', 'in_review', 'in_progress', 'todo', 'blocked', 'backlog'].map((k) => ({ label: STATUS_META[k].label, value: s[k] ?? 0, cls: STATUS_META[k].dot }))} />
+      </div>
+      <aside className="min-w-0">
+        <section>
+          <SectionTitle>Pending approvals</SectionTitle>
+          <div className="space-y-3">
+            {approvals.data?.map((a) => <ApprovalCard key={a.id} a={a} compact agentName={agent(a.agent_id)?.name} />)}
+            {approvals.data?.length === 0 && <div className="card px-4 py-4 text-sm text-zinc-500">No decisions waiting.</div>}
+          </div>
+        </section>
+      </aside>
+    </div>
 
+    <OperationsSection projectId={project.id} slugOf={() => project.slug} />
+
+    <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
+      <div className="min-w-0 space-y-6">
         <section>
           <SectionTitle>Team</SectionTitle>
           <div className="card divide-y divide-zinc-100 dark:divide-white/[0.05]">
@@ -118,14 +135,7 @@ export function ProjectOverview() {
         </section>
       </div>
 
-      <aside className="space-y-6">
-        <section>
-          <SectionTitle>Pending approvals</SectionTitle>
-          <div className="space-y-3">
-            {approvals.data?.map((a) => <ApprovalCard key={a.id} a={a} compact agentName={agent(a.agent_id)?.name} />)}
-            {approvals.data?.length === 0 && <div className="card px-4 py-4 text-sm text-zinc-500">No decisions waiting.</div>}
-          </div>
-        </section>
+      <aside className="min-w-0 space-y-6">
         <section>
           <SectionTitle>Activity</SectionTitle>
           <div className="card max-h-[32rem] overflow-y-auto scrollbar-thin">
@@ -133,6 +143,7 @@ export function ProjectOverview() {
           </div>
         </section>
       </aside>
+    </div>
     </div>
   );
 }

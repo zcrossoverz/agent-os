@@ -2,13 +2,13 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { QueryClientProvider, useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { LayoutDashboard, KeyRound, Plus, LogOut, Sparkles, Moon, Sun, Monitor, Pause, Menu, X } from 'lucide-react';
+import { LayoutDashboard, KeyRound, Plus, LogOut, Moon, Sun, Monitor, Pause, Menu, X } from 'lucide-react';
 import { useTheme } from './lib/theme';
 import { avatarColor } from './lib/format';
 import { api, get, queryClient } from './lib/api';
 import { useLiveUpdates } from './lib/live';
 import { useOverview } from './lib/queries';
-import { Loading, Toasts } from './components/ui';
+import { Loading, LogoMark, Toasts } from './components/ui';
 import { OverviewPage } from './pages/Overview';
 import { AccountsPage } from './pages/Accounts';
 import { NewProjectPage } from './pages/NewProject';
@@ -79,9 +79,7 @@ function MobileTopBar({ onMenu }: { onMenu: () => void }) {
         {attention > 0 && <span className="absolute top-1 right-1 size-2 rounded-full bg-red-500" />}
       </button>
       <NavLink to="/" className="flex items-center gap-2">
-        <span className="flex size-7 items-center justify-center rounded-[9px] bg-gradient-to-br from-accent-400 via-accent-500 to-fuchsia-500">
-          <Sparkles className="size-3.5 text-white" />
-        </span>
+        <LogoMark size={26} />
         <span className="text-[14px] font-semibold tracking-tight">AgentOS</span>
       </NavLink>
     </div>
@@ -117,12 +115,10 @@ function Sidebar({ live, version, open, onClose }: { live: string; version: stri
       )}
     >
       <div className="flex items-center gap-2.5 px-4 pt-5 pb-4">
-        <div className="relative flex size-8 items-center justify-center rounded-[10px] bg-gradient-to-br from-accent-400 via-accent-500 to-fuchsia-500 shadow-[0_4px_14px_-4px_rgb(109_106_240/0.7)]">
-          <Sparkles className="size-4 text-white" />
-        </div>
+        <LogoMark size={30} />
         <div>
           <div className="text-[14px] leading-tight font-semibold tracking-tight">AgentOS</div>
-          <div className="text-[11px] text-zinc-500">AI team control plane</div>
+          <div className="text-[11px] text-zinc-500">Agent operations</div>
         </div>
         <button className="ml-auto rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-200/60 md:hidden dark:hover:bg-white/[0.06]" onClick={onClose} aria-label="Close menu">
           <X className="size-4" />

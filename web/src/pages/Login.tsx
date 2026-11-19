@@ -1,5 +1,5 @@
+import { LogoMark } from '../components/ui';
 import { useState } from 'react';
-import { Sparkles } from 'lucide-react';
 import { api, queryClient } from '../lib/api';
 
 export function LoginPage() {
@@ -26,9 +26,7 @@ export function LoginPage() {
         }}
       >
         <div className="mb-6 flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-accent-400 via-accent-500 to-fuchsia-500 shadow-[0_6px_20px_-6px_rgb(109_106_240/0.8)]">
-            <Sparkles className="size-5 text-white" />
-          </div>
+          <LogoMark size={40} />
           <div>
             <h1 className="text-lg font-semibold tracking-tight">AgentOS</h1>
             <p className="text-xs text-zinc-500">Sign in as the project owner</p>
